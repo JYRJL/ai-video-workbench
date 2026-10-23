@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AI 视频工作台</string>
+    <string name="title_activity_main">AI 视频工作台</string>
+    <string name="package_name">com.jyjl.aivideo</string>
+    <string name="custom_url_scheme">com.jyjl.aivideo</string>
+</resources>

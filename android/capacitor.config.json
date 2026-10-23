@@ -1,0 +1,9 @@
+﻿{
+  "appId": "com.jyjl.aivideo",
+  "appName": "AI 视频工作台",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": {
+    "allowMixedContent": true
+  }
+}

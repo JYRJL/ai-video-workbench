@@ -1,0 +1,3444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0F1419" />
+  <title>AI 视频工作台</title>
+  <meta name="app-rev" content="2.4" />
+  <link rel="icon" type="image/png" href="app-icon.png" />
+  <link rel="apple-touch-icon" href="app-icon.png" />
+  <style>
+    :root {
+      --ink: #0F1419;
+      --paper: #F3F5F4;
+      --panel: #FFFFFF;
+      --accent: #1F6F5C;
+      --accent-soft: #E5F2EE;
+      --warn: #C45C26;
+      --warn-soft: #FBEDE4;
+      --ok: #2D8A4E;
+      --haze: #6B7A76;
+      --line: #E2E8E5;
+      --shadow: 0 8px 28px rgba(15, 20, 25, 0.08);
+      --font: "PingFang SC", "Microsoft YaHei", "Segoe UI", system-ui, -apple-system, sans-serif;
+      --mono: Consolas, "SF Mono", ui-monospace, Menlo, monospace;
+      --radius: 14px;
+      --safe-b: env(safe-area-inset-bottom, 0px);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    html { font-size: calc(16px * var(--ui-scale, 1)); }
+    body {
+      font-family: var(--font);
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.5;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    /* ===== 桌面布局：左侧导航 + 宽主区 ===== */
+    .app-shell {
+      max-width: none;
+      width: 100%;
+      height: 100vh;
+      margin: 0;
+      background: var(--paper);
+      box-shadow: none;
+      display: grid;
+      grid-template-columns: 200px minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-areas:
+        "side head"
+        "side main";
+    }
+    header {
+      grid-area: head;
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(243, 245, 244, 0.95);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--line);
+      padding: 16px 24px 14px;
+    }
+    .brand-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .brand h1 { margin: 0; font-size: calc(20px * var(--ui-scale, 1)); font-weight: 700; }
+    .brand p { margin: 2px 0 0; font-size: calc(13px * var(--ui-scale, 1)); color: var(--haze); }
+    .mode-pill {
+      font-size: calc(12px * var(--ui-scale, 1)); font-weight: 600; padding: 6px 12px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent); white-space: nowrap;
+    }
+    .mode-pill.mock { background: var(--warn-soft); color: var(--warn); }
+    main {
+      grid-area: main;
+      overflow: auto;
+      padding: 20px 28px 40px;
+    }
+    main > section {
+      max-width: none;
+      width: 100%;
+    }
+    @media (min-width: 1100px) {
+      main > section { max-width: 1080px; }
+      /* 最大化时主区尽量撑满，避免右侧大片空白 */
+      main > section#view-generate,
+      main > section#view-tasks,
+      main > section#view-settings,
+      main > section#view-help { max-width: 100%; }
+    }
+    .panel {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 18px 20px; margin-bottom: 16px;
+    }
+    .panel h2 { margin: 0 0 12px; font-size: calc(16px * var(--ui-scale, 1)); font-weight: 700; }
+    label.field { display: block; margin-bottom: 12px; }
+    .label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; gap: 8px; }
+    .label-row span:first-child { font-size: calc(13px * var(--ui-scale, 1)); font-weight: 600; }
+    .req { color: var(--warn); margin-left: 2px; }
+    .hint { font-size: calc(11px * var(--ui-scale, 1)); color: var(--haze); }
+    input[type="text"], input[type="password"], input[type="url"], input[type="number"], textarea, select {
+      width: 100%; border: 1px solid var(--line); border-radius: 10px; background: #FAFBFA;
+      color: var(--ink); font: inherit; font-size: calc(14px * var(--ui-scale, 1)); padding: 11px 12px; outline: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--accent); box-shadow: 0 0 0 3px rgba(31, 111, 92, 0.15);
+    }
+    textarea { min-height: 96px; resize: vertical; }
+    .help-text { margin-top: 6px; font-size: calc(11px * var(--ui-scale, 1)); color: var(--haze); word-break: normal; overflow-wrap: anywhere; }
+    .mono-line { font-family: var(--mono); font-size: calc(11px * var(--ui-scale, 1)); color: var(--haze); }
+    select {
+      font-weight: 600;
+    }
+    .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .seg button {
+      border: 1px solid var(--line); background: #FAFBFA; border-radius: 10px;
+      padding: 10px 6px; font: inherit; font-size: calc(13px * var(--ui-scale, 1)); color: var(--ink); cursor: pointer; min-height: 44px;
+    }
+    .seg button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+    .range-row { display: flex; align-items: center; gap: 10px; }
+    .range-row input[type="range"] { flex: 1; accent-color: var(--accent); height: 28px; }
+    .range-value {
+      min-width: 52px; text-align: center; font-family: var(--mono); font-weight: 700; font-size: calc(14px * var(--ui-scale, 1));
+      background: var(--accent-soft); color: var(--accent); border-radius: 8px; padding: 6px 8px;
+    }
+    .cost-strip {
+      margin: 4px 0 12px; border-radius: 12px; border: 1px solid #CFE3DC;
+      background: linear-gradient(135deg, #EAF6F2 0%, #F7FBF9 55%, #EEF4F1 100%);
+      padding: 12px 14px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end;
+    }
+    .cost-strip .k { font-size: calc(11px * var(--ui-scale, 1)); color: var(--haze); text-transform: uppercase; letter-spacing: 0.04em; }
+    .cost-strip .v { font-family: var(--mono); font-size: calc(26px * var(--ui-scale, 1)); font-weight: 700; color: var(--accent); line-height: 1.1; }
+    .cost-strip .meta {
+      grid-column: 1 / -1; font-size: calc(12px * var(--ui-scale, 1)); color: var(--haze);
+      border-top: 1px dashed #CFE3DC; padding-top: 8px;
+    }
+    .btn {
+      width: 100%; min-height: 48px; border: none; border-radius: 12px; font: inherit;
+      font-size: calc(15px * var(--ui-scale, 1)); font-weight: 700; cursor: pointer;
+    }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); margin-top: 8px; }
+    .btn-danger { background: var(--warn-soft); color: var(--warn); }
+    .toast {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      max-width: min(520px, calc(100vw - 48px));
+      background: var(--ink);
+      color: #fff;
+      font-size: calc(13px * var(--ui-scale, 1));
+      padding: 12px 18px;
+      border-radius: 10px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s ease, transform .2s ease;
+      z-index: 80;
+      text-align: center;
+      box-shadow: 0 8px 28px rgba(15, 20, 25, 0.18);
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.err { background: #7A2E12; }
+    .toast.ok { background: #1F5C38; }
+    /* 侧边导航 */
+    nav.tabs {
+      grid-area: side;
+      position: relative;
+      left: auto; bottom: auto; transform: none;
+      width: 200px; height: 100%;
+      background: #ECF1EF;
+      border-right: 1px solid var(--line);
+      border-top: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 18px 12px;
+      z-index: 30;
+    }
+    nav.tabs::before {
+      content: "AI 视频";
+      display: block;
+      font-weight: 700;
+      font-size: calc(14px * var(--ui-scale, 1));
+      color: var(--ink);
+      padding: 4px 10px 16px;
+      letter-spacing: 0.02em;
+    }
+    nav.tabs label.tab-btn {
+      border: none;
+      background: transparent;
+      font: inherit;
+      font-size: calc(14px * var(--ui-scale, 1));
+      color: var(--haze);
+      min-height: 42px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      user-select: none;
+      border-radius: 10px;
+      padding: 0 12px;
+      width: 100%;
+      text-align: left;
+    }
+    nav.tabs label.tab-btn:hover { background: rgba(31,111,92,0.08); color: var(--ink); }
+    .side-foot {
+      margin-top: auto;
+      padding: 12px 10px 4px;
+      font-size: calc(11px * var(--ui-scale, 1));
+      color: var(--haze);
+      line-height: 1.45;
+      border-top: 1px solid var(--line);
+    }
+    .side-foot .designer { font-weight: 700; color: var(--ink); }
+    .about-box h3 { margin: 0 0 8px; font-size: calc(14px * var(--ui-scale, 1)); }
+    .about-box ul { margin: 0; padding-left: 18px; }
+    .about-box li { margin-bottom: 6px; font-size: calc(12px * var(--ui-scale, 1)); color: var(--ink); }
+    .about-box .meta { margin-top: 10px; font-size: calc(12px * var(--ui-scale, 1)); color: var(--haze); }
+    .app-logo {
+      width: 40px; height: 40px; border-radius: 10px;
+      object-fit: cover; border: 1px solid var(--line);
+    }
+    .brand-row .brand { display: flex; align-items: center; gap: 12px; }
+    /* 宽屏：生成区两列 */
+    @media (min-width: 1000px) {
+      .desk-2col {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.75fr);
+        gap: 16px;
+        align-items: start;
+      }
+      .desk-2col > .panel { margin-bottom: 0; }
+      .desk-2col > .stack .panel { margin-bottom: 12px; }
+    }
+    nav.tabs label.tab-btn .ico { font-size: calc(14px * var(--ui-scale, 1)); line-height: 1; width: 18px; text-align: center; }
+    #nt-generate:checked ~ .app-shell nav label[for="nt-generate"],
+    #nt-help:checked ~ .app-shell nav label[for="nt-help"],
+    #nt-tasks:checked ~ .app-shell nav label[for="nt-tasks"],
+    #nt-settings:checked ~ .app-shell nav label[for="nt-settings"] {
+      color: var(--accent);
+      font-weight: 700;
+      background: var(--panel);
+      box-shadow: 0 1px 0 rgba(0,0,0,0.04);
+    }
+    /* 宽屏表单两列 */
+    @media (min-width: 900px) {
+      #view-generate .panel:first-child,
+      #view-settings .panel {
+        /* keep readable */
+      }
+      .grid2 { grid-template-columns: 1fr 1fr; }
+      .btn { max-width: 360px; }
+      .btn-row .btn { max-width: none; }
+    }
+    /* 手机窄屏：退回底部 Tab */
+    @media (max-width: 720px) {
+      body { overflow: auto; }
+      .app-shell {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        max-width: 100%;
+      }
+      header { position: sticky; top: 0; padding: 12px 14px; }
+      main { padding: 14px 14px 96px; overflow: visible; }
+      main > section { max-width: none; }
+      nav.tabs {
+        position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+        width: 100%; height: auto;
+        flex-direction: row;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        border-right: none;
+        border-top: 1px solid var(--line);
+        background: rgba(255,255,255,0.96);
+        padding: 8px 6px calc(8px + var(--safe-b));
+        z-index: 40;
+      }
+      nav.tabs::before { display: none; }
+      nav.tabs label.tab-btn {
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 2px;
+        font-size: calc(11px * var(--ui-scale, 1));
+        min-height: 48px;
+        padding: 4px;
+        border-radius: 0;
+      }
+      /* 窄屏底部 Tab 不显示设计者/版本（设置→产品信息已有），避免占高度 */
+      .side-foot { display: none; }
+      .toast {
+        left: 50%; right: auto; top: 12px; bottom: auto;
+        transform: translateX(-50%) translateY(-8px);
+      }
+      .toast.show { transform: translateX(-50%) translateY(0); }
+      .btn { max-width: none; }
+    }
+    /* 任务页：最大化时限制卡片宽度，避免整页拉散 */
+    #view-tasks,
+    #view-tasks > .panel {
+      max-width: 960px;
+      width: 100%;
+    }
+    .task-item {
+      border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 12px; background: #FAFBFA;
+      display: grid;
+      grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .task-item .task-body { min-width: 0; }
+    .task-item .task-media { min-width: 0; }
+    .task-item .top { display: flex; justify-content: space-between; gap: 8px; align-items: center; margin-bottom: 6px; }
+    .status { font-size: calc(11px * var(--ui-scale, 1)); font-weight: 700; padding: 3px 8px; border-radius: 999px; }
+    .status.queued, .status.running { background: #EEF2FF; color: #3B4CCA; }
+    .status.success { background: #E7F6EC; color: var(--ok); }
+    .status.failed { background: var(--warn-soft); color: var(--warn); }
+    .status.mock { background: #F4F0E6; color: #8A6A2F; }
+    .task-item .prompt { font-size: calc(14px * var(--ui-scale, 1)); margin: 0 0 8px; word-break: break-word; line-height: 1.45; }
+    .task-item .meta { font-size: calc(11px * var(--ui-scale, 1)); color: var(--haze); font-family: var(--mono); word-break: normal; overflow-wrap: anywhere; }
+    video.preview {
+      width: 100%;
+      max-width: 280px;
+      max-height: 200px;
+      border-radius: 10px;
+      background: #111;
+      display: block;
+      object-fit: contain;
+      margin: 0;
+    }
+    .task-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .task-actions button {
+      flex: 0 0 auto;
+      width: auto;
+      min-width: 92px;
+      max-width: 140px;
+      min-height: 36px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #fff;
+      font: inherit;
+      font-size: calc(13px * var(--ui-scale, 1));
+      cursor: pointer;
+      color: var(--ink);
+      padding: 0 14px;
+    }
+    .task-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+    @media (max-width: 900px) {
+      .task-item { grid-template-columns: 1fr; }
+      video.preview { max-width: 100%; max-height: 280px; }
+    }
+    .task-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .task-actions button {
+      flex: 0 0 auto; width: auto; min-width: 92px; max-width: 140px; min-height: 36px; border-radius: 10px;
+      border: 1px solid var(--line); background: #fff; font: inherit; font-size: calc(13px * var(--ui-scale, 1)); cursor: pointer; color: var(--ink);
+      padding: 0 14px;
+    }
+    .task-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+    @media (max-width: 900px) {
+      .task-item { grid-template-columns: 1fr; }
+      video.preview { max-width: 100%; max-height: 360px; }
+    }
+    .empty { text-align: center; color: var(--haze); font-size: calc(13px * var(--ui-scale, 1)); padding: 22px 12px; }
+    .steps { margin: 0; padding-left: 18px; }
+    .steps li { margin-bottom: 8px; font-size: calc(13px * var(--ui-scale, 1)); }
+    .kv { width: 100%; border-collapse: collapse; font-size: calc(12px * var(--ui-scale, 1)); }
+    .kv th, .kv td { border-bottom: 1px solid var(--line); padding: 8px 4px; text-align: left; vertical-align: top; }
+    .kv th { color: var(--haze); font-weight: 600; width: 34%; min-width: 4.5em; white-space: nowrap; word-break: keep-all; }
+    .note-box {
+      background: var(--warn-soft); border: 1px solid #F0D4C2; color: #7A3A14;
+      border-radius: 10px; padding: 10px 12px; font-size: calc(12px * var(--ui-scale, 1)); margin-top: 10px;
+    }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+    .chip {
+      font-family: var(--mono); font-size: calc(11px * var(--ui-scale, 1)); background: var(--accent-soft);
+      color: var(--accent); padding: 4px 8px; border-radius: 999px;
+    }
+
+    /* 字体缩放（设置可调） */
+    body { font-size: calc(14px * var(--ui-scale, 1)); }
+    .demo-panel {
+      background: var(--warn-soft); border: 1px solid #F0D4C2; border-radius: var(--radius);
+      padding: 12px 14px; margin-bottom: 14px;
+    }
+    .demo-panel h2 { margin: 0 0 8px; font-size: calc(15px * var(--ui-scale, 1)); color: #7A3A14; }
+    .demo-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .demo-row label { display: flex; align-items: center; gap: 8px; font-size: calc(13px * var(--ui-scale, 1)); font-weight: 700; color: #7A3A14; }
+    .demo-panel .btn { margin-top: 10px; }
+    .demo-panel .help-text { color: #7A3A14; }
+    .sub-head {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    }
+    .sub-head h2 { margin: 0; flex: 1; font-size: calc(16px * var(--ui-scale, 1)); }
+    .btn-back {
+      min-height: 36px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line);
+      background: #fff; font: inherit; font-size: calc(13px * var(--ui-scale, 1)); cursor: pointer;
+    }
+    .home-actions { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 12px; }
+    .home-actions .btn, .dir-row .btn, .btn-row .btn, .btn-row .btn-ghost, .btn-row .btn-primary, .btn-row .btn-danger {
+      width: 100% !important; max-width: none !important; margin-top: 0 !important; min-height: 42px;
+    }
+    .dir-row, .btn-row, .action-row {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: stretch;
+    }
+    .dir-path {
+      grid-column: 1 / -1; min-height: 40px; border: 1px solid var(--line); border-radius: 10px;
+      padding: 10px 12px; font-family: var(--mono); font-size: calc(12px * var(--ui-scale, 1)); background: #FAFBFA;
+      word-break: normal; overflow-wrap: anywhere; color: var(--ink); display: flex; align-items: center;
+    }
+    .inline-editor-slot { margin: 10px 0 4px; }
+    .inline-editor-slot .panel { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(31,111,92,0.12); }
+    .configured-item.editing { border-color: var(--accent); background: var(--accent-soft); }
+    .configured-list { display: flex; flex-direction: column; gap: 8px; }
+    .configured-item {
+      border: 1px solid var(--line); border-radius: 12px; background: #FAFBFA; padding: 12px;
+    }
+    .configured-item .name { font-weight: 700; font-size: calc(14px * var(--ui-scale, 1)); margin: 0 0 4px; }
+    .configured-item .meta { font-family: var(--mono); font-size: calc(11px * var(--ui-scale, 1)); color: var(--haze); margin: 0 0 4px; word-break: normal; overflow-wrap: anywhere; }
+
+    .hidden { display: none !important; }
+
+    /* ===== 纯 CSS 页签（不依赖 JS 也能切页）===== */
+    .nav-tab-radio {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #view-generate,
+    #view-help,
+    #view-tasks,
+    #view-settings { display: none; }
+
+    #nt-generate:checked ~ .app-shell #view-generate { display: block; }
+    #nt-help:checked ~ .app-shell #view-help { display: block; }
+    #nt-tasks:checked ~ .app-shell #view-tasks { display: block; }
+    #nt-settings:checked ~ .app-shell #view-settings { display: block; }
+
+    .profile-list { display: flex; flex-direction: column; gap: 8px; }
+    .profile-item {
+      border: 1px solid var(--line); border-radius: 12px; background: #FAFBFA; padding: 10px 12px;
+    }
+    .profile-item.active { border-color: var(--accent); background: var(--accent-soft); }
+    .profile-item .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .profile-item .name { font-size: calc(14px * var(--ui-scale, 1)); font-weight: 700; margin: 0 0 4px; }
+    .profile-item .meta { font-family: var(--mono); font-size: calc(11px * var(--ui-scale, 1)); color: var(--haze); word-break: normal; overflow-wrap: anywhere; margin: 0; }
+    .profile-item .badge {
+      font-size: calc(10px * var(--ui-scale, 1)); font-weight: 700; color: var(--accent); background: #fff;
+      border: 1px solid var(--accent); border-radius: 999px; padding: 2px 8px; white-space: nowrap;
+    }
+    .profile-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .profile-actions button {
+      flex: 1 1 30%; min-height: 36px; border-radius: 10px; border: 1px solid var(--line);
+      background: #fff; font: inherit; font-size: calc(12px * var(--ui-scale, 1)); cursor: pointer; color: var(--ink);
+    }
+    .profile-actions button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+    .profile-actions button.danger { color: var(--warn); border-color: #E8C4B0; background: var(--warn-soft); }
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .btn-row .btn, .btn-row .btn-ghost { margin-top: 0; width: 100%; max-width: none; min-height: 42px; }
+    .model-item {
+      border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: #FAFBFA;
+    }
+    .model-item .name { font-size: calc(13px * var(--ui-scale, 1)); font-weight: 700; margin: 0 0 4px; }
+    .model-item .meta { font-family: var(--mono); font-size: calc(11px * var(--ui-scale, 1)); color: var(--haze); margin: 0; word-break: normal; overflow-wrap: anywhere; }
+    input[type="file"] {
+      width: 100%; font-size: calc(13px * var(--ui-scale, 1)); padding: 8px 0;
+    }
+    #imageStatus.ok { color: var(--ok); }
+    #imageStatus.err { color: var(--warn); }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .flow-steps {
+      background: var(--accent-soft); border-radius: 12px; padding: 10px 12px; margin-bottom: 12px;
+      font-size: calc(12px * var(--ui-scale, 1)); color: var(--accent);
+    }
+    .flow-steps strong { color: var(--ink); }
+    .confirm-mask {
+      position: fixed; inset: 0; background: rgba(15,20,25,0.45); z-index: 60;
+      display: flex; align-items: flex-end; justify-content: center; padding: 16px;
+      opacity: 0; pointer-events: none; transition: opacity .15s ease;
+    }
+    .confirm-mask.show { opacity: 1; pointer-events: auto; }
+    .confirm-box {
+      width: min(400px, 100%); background: var(--panel); border-radius: 16px; padding: 16px;
+      box-shadow: var(--shadow); transform: translateY(12px); transition: transform .15s ease;
+    }
+    .confirm-mask.show .confirm-box { transform: translateY(0); }
+    .confirm-box h3 { margin: 0 0 8px; font-size: calc(15px * var(--ui-scale, 1)); }
+    .confirm-box p { margin: 0 0 14px; font-size: calc(13px * var(--ui-scale, 1)); color: var(--haze); word-break: break-word; }
+    .confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .confirm-actions button {
+      min-height: 44px; border-radius: 12px; border: 1px solid var(--line);
+      background: #fff; font: inherit; font-size: calc(14px * var(--ui-scale, 1)); font-weight: 700; cursor: pointer;
+    }
+    .confirm-actions button.ok { background: var(--warn); border-color: var(--warn); color: #fff; }
+    @media (min-width: 431px) {
+      .app-shell { border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <!-- 页签状态：纯 CSS 控制显示哪一页 -->
+  <input type="radio" name="navtab" id="nt-generate" class="nav-tab-radio" checked />
+  <input type="radio" name="navtab" id="nt-help" class="nav-tab-radio" />
+  <input type="radio" name="navtab" id="nt-tasks" class="nav-tab-radio" />
+  <input type="radio" name="navtab" id="nt-settings" class="nav-tab-radio" />
+
+  <div class="app-shell">
+    <header>
+      <div class="brand-row">
+        <div class="brand">
+          <img class="app-logo" src="app-icon.png" alt="" width="40" height="40" />
+          <div>
+            <h1>AI 视频工作台</h1>
+            <p id="brandSub">设计者 JYJL · 桌面 / 安卓</p>
+          </div>
+        </div>
+        <div class="mode-pill" id="modePill">演示模式</div>
+      </div>
+    </header>
+
+    <main>
+      <!-- 生成 -->
+      <section id="view-generate">
+        <div class="desk-2col">
+        <div class="panel">
+          <div class="flow-steps">
+            <strong>图生 / 文生分开</strong>：图生模型（如 <code>xxx-i2v</code>）
+            <strong>必须</strong>提供参考图；文生模型只填提示词，<strong>不要</strong>图。
+          </div>
+          <h2>生成视频</h2>
+
+          <label class="field">
+            <div class="label-row">
+              <span>接口<span class="req">*</span></span>
+              <span class="hint">决定 URL 与 Key</span>
+            </div>
+            <select id="profileSelect" aria-label="选择接口"></select>
+            <div class="help-text" id="profileSelectHelp"></div>
+          </label>
+
+          <label class="field">
+            <div class="label-row">
+              <span>模型<span class="req">*</span></span>
+              <span class="hint">仅当前接口可用</span>
+            </div>
+            <select id="modelSelect" aria-label="选择模型"></select>
+            <div class="help-text" id="modelHelp"></div>
+          </label>
+
+          <div id="noModelBanner" class="note-box hidden">
+            当前接口还没有模型。请到 <strong>设置 → 该接口的模型</strong> 手动添加；模型 ID 需与你所用服务商的模型名完全一致。
+          </div>
+
+          <div class="field hidden" id="imageField">
+            <div class="label-row">
+              <span>参考图<span class="req" id="imageReq">*</span></span>
+              <span class="hint" id="imageHint">图生必填</span>
+            </div>
+            <div class="seg" id="imageModeSeg" role="group" aria-label="图片输入方式" style="grid-template-columns:1fr 1fr;margin-bottom:8px">
+              <button type="button" data-imode="file" class="active">本地图片</button>
+              <button type="button" data-imode="url">图片链接</button>
+            </div>
+            <div id="imageFileBox">
+              <button type="button" class="btn btn-primary hidden" id="btnPickGallery" style="width:auto;max-width:none;margin-bottom:8px">从相册 / 文件选择…</button>
+              <input id="imageFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <div class="help-text">支持 png / jpg / webp。会自动压缩后作为 input_reference 提交。安卓可点上方按钮打开系统相册/文件。</div>
+              <img id="imagePreview" alt="参考图预览" class="hidden" style="width:100%;max-height:160px;object-fit:contain;border-radius:10px;margin-top:8px;background:#000" />
+            </div>
+            <div id="imageUrlBox" class="hidden">
+              <input id="imageUrl" type="url" placeholder="https://example.com/first.jpg" autocomplete="off" />
+              <div class="help-text" id="imageHelp">图生必须有图：本地上传或粘贴公网 URL。</div>
+            </div>
+            <div class="help-text" id="imageStatus"></div>
+          </div>
+
+          <label class="field">
+            <div class="label-row">
+              <span>提示词<span class="req">*</span></span>
+              <span class="hint">主体 / 动作 / 镜头</span>
+            </div>
+            <textarea id="prompt" placeholder="例如：镜头缓慢推进，一只橘猫在窗台伸懒腰…"></textarea>
+          </label>
+
+          <div class="field">
+            <div class="label-row">
+              <span>清晰度<span class="req">*</span></span>
+              <span class="hint">按模型可选项</span>
+            </div>
+            <div class="seg" id="sizeSeg" role="group" aria-label="清晰度"></div>
+          </div>
+
+          <div class="field">
+            <div class="label-row">
+              <span>时长<span class="req">*</span></span>
+              <span class="hint" id="secondsHint">—</span>
+            </div>
+            <div class="range-row">
+              <input id="seconds" type="range" min="3" max="15" step="1" value="5" />
+              <div class="range-value" id="secondsVal">5s</div>
+            </div>
+          </div>
+
+          <div class="cost-strip" aria-live="polite">
+            <div>
+              <div class="k">预估费用</div>
+              <div class="v" id="costValue">—</div>
+            </div>
+            <div class="hint" id="costFormula">请先选择接口与模型</div>
+            <div class="meta" id="costMeta"></div>
+          </div>
+
+          <button class="btn btn-primary" id="btnGenerate" type="button">生成视频</button>
+
+          <div class="demo-panel" id="demoPanel" style="margin-top:14px;margin-bottom:0">
+            <h2>演示模式</h2>
+            <div class="demo-row">
+              <label>
+                <input id="mockMode" type="checkbox" style="width:18px;height:18px;accent-color:var(--warn)" />
+                开启演示模式（不调真实接口、不扣费）
+              </label>
+            </div>
+            <div class="help-text" style="margin-top:8px">
+              <strong>必须先开启演示模式</strong>，才能点「填入演示参数」。
+              未开启时点「生成视频」走真实接口并<strong>扣费</strong>（二次确认）。
+            </div>
+            <button class="btn btn-ghost" id="btnFillDemo" type="button">填入演示参数</button>
+          </div>
+        </div>
+
+        <div class="stack">
+          <div class="panel">
+            <h2>提交前检查</h2>
+            <ul class="steps">
+              <li>已选接口与模型，或处于演示模式</li>
+              <li>图生：已选本地图或图片链接；文生无需图</li>
+              <li>提示词写清主体 / 动作 / 镜头</li>
+              <li>成功后尽快「下载视频」（约 24 小时后可能删除）</li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h2>使用规则</h2>
+            <ul class="steps">
+              <li>先定<strong>接口</strong>，再定该接口下的<strong>模型 ID</strong></li>
+              <li>模型列表只属于某个接口，禁止跨站混用</li>
+              <li>新建接口的模型区为空，需手动添加</li>
+              <li>请勿反复真实生成（会扣费）</li>
+            </ul>
+          </div>
+        </div>
+        </div>
+      </section>
+
+      <!-- 说明 -->
+      <section id="view-help">
+        <div class="panel">
+          <h2>如何使用</h2>
+          <ol class="steps">
+            <li><strong>设置</strong>：先「添加接口」（Base URL + API Key），再为它添加模型；可建多套接口。</li>
+            <li><strong>生成</strong>：选接口 → 选模型（真实 model 名）→ 提示词 → 图生再选本地图或链接。</li>
+            <li><strong>图生必填图</strong>；<strong>文生不需要图</strong>。</li>
+            <li>任务列表只保存<strong>记录和链接</strong>，不保存视频文件。</li>
+            <li>点「下载视频」后会<strong>自动保存到「设置 → 下载目录」</strong>；约 24 小时后线上文件可能删除，请及时下载。</li>
+          </ol>
+          <div class="note-box">
+            新建接口模型区为空，只属于新接口；编辑只显示该接口模型。
+            请求：model / prompt / duration（+图生 input_reference）。
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>参数说明</h2>
+          <table class="kv">
+            <tr><th>接口</th><td>必选。URL + Key，多套可切换。</td></tr>
+            <tr><th>模型</th><td>必选。显示名与接口 model 字段一致。</td></tr>
+            <tr><th>参考图</th><td><strong>图生必填</strong>：本地上传或 HTTPS URL。文生不传图。</td></tr>
+            <tr><th>提示词</th><td>必填。</td></tr>
+            <tr><th>时长 / 清晰度</th><td>按所选模型规格选择。</td></tr>
+          </table>
+        </div>
+
+        <div class="panel">
+          <h2>模型从哪里来</h2>
+          <ul class="steps">
+            <li>模型 ID 由你的视频生成服务商提供（见其文档或模型列表），本项目不内置任何模型。</li>
+            <li>图生模型通常带 <code>-i2v</code> 字样，生成时必须提供参考图；文生模型只需提示词。</li>
+            <li>在「设置 → 添加接口 → 该接口的模型」中，把模型 ID、类型、清晰度、单价、时长范围如实填入即可使用。</li>
+          </ul>
+        </div>
+
+        <div class="panel">
+          <h2>接口约定（兼容 /v1/video/generations 的服务商）</h2>
+          <table class="kv">
+            <tr><th>提交</th><td><span style="font-family:var(--mono)">POST /v1/video/generations</span></td></tr>
+            <tr><th>请求体</th><td><span style="font-family:var(--mono)">{"model","prompt","duration"}</span>；有图加 <span style="font-family:var(--mono)">input_reference</span></td></tr>
+            <tr><th>轮询</th><td><span style="font-family:var(--mono)">GET /v1/video/generations/{task_id}</span></td></tr>
+            <tr><th>状态</th><td><span style="font-family:var(--mono)">data.status = SUCCESS | FAILURE</span></td></tr>
+            <tr><th>结果</th><td><span style="font-family:var(--mono)">data.result_url</span>；失败 <span style="font-family:var(--mono)">data.fail_reason</span></td></tr>
+          </table>
+        </div>
+
+        <div class="panel about-box">
+          <h2>关于与声明</h2>
+          <h3>免责声明与禁止事项</h3>
+          <ul>
+            <li>本软件按「现状」提供，不保证生成效果、接口可用性与服务连续性。</li>
+            <li>API Key 与调用费用由使用者自行保管与承担；请勿将 Key 写入公开文件。</li>
+            <li>生成内容的合法性、版权与使用后果由使用者自行负责；请遵守当地法律法规与平台条款。</li>
+            <li>禁止用于违法活动、侵权、深度伪造/冒充他人、骚扰或任何欺诈用途。</li>
+            <li>禁止恶意刷量、攻击或滥用第三方接口；请合理控制生成频率，避免不必要的扣费。</li>
+            <li>开发者 JYJL 不对接口扣费、视频被删除、数据丢失或间接损失承担责任。</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 任务 -->
+      <section id="view-tasks">
+        <div class="panel">
+          <div class="label-row" style="margin-bottom:8px">
+            <h2 style="margin:0">任务列表</h2>
+            <button type="button" id="btnClearTasks" class="btn btn-danger" style="width:auto;padding:8px 12px;min-height:36px;font-size: calc(12px * var(--ui-scale, 1))">清空</button>
+          </div>
+          <div class="help-text" style="margin-bottom:12px">
+            点击「下载视频」后，会<strong>自动保存到「设置 → 下载目录」中配置的文件夹</strong>（不会每次再弹选择框）。
+            保存成功后会提示完整路径。未配置目录时：默认写入应用目录下的 <code>data\backups</code>。
+            服务商侧文件约 24 小时后可能删除，请及时下载。
+          </div>
+          <div id="taskList"></div>
+        </div>
+      </section>
+
+      <!-- 设置 -->
+      <section id="view-settings">
+        <!-- 设置首页：已配置一览 + 偏好；配置点进子页 -->
+        <div id="settingsHome">
+          <div class="panel">
+            <div class="label-row" style="margin-bottom:8px">
+              <h2 style="margin:0">接口与模型</h2>
+              <span class="hint">点「配置」修改；点「添加接口」新建</span>
+            </div>
+            <div class="home-actions">
+              <button class="btn btn-primary" id="btnAddProfile" type="button">添加接口</button>
+            </div>
+            <div class="configured-list" id="configuredList"></div>
+            <div class="help-text" style="margin-top:10px">
+              每个接口一套独立模型列表；新建接口的模型区为空，需手动添加。
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>字体大小</h2>
+            <div class="range-row">
+              <span class="hint">小</span>
+              <input id="fontSizeRange" type="range" min="85" max="130" step="1" value="100" aria-label="字体大小" />
+              <span class="hint">大</span>
+              <div class="range-value" id="fontSizeVal">100%</div>
+            </div>
+            <div class="help-text">左右拖动调节，立即生效并记住。</div>
+          </div>
+
+          <div class="panel">
+            <h2>下载 / 备份目录</h2>
+            <div class="help-text" style="margin:0 0 10px">
+              点击选择目录，<strong>默认应用目录</strong>（安装包内 data）。视频与导出备份写入此处。
+            </div>
+            <div class="dir-path" id="downloadDirDisplay">应用目录（默认）</div>
+            <div class="dir-row" style="margin-top:8px">
+              <button class="btn btn-primary" id="btnPickDownloadDir" type="button">选择目录…</button>
+              <button class="btn btn-ghost" id="btnResetDownloadDir" type="button">恢复默认</button>
+            </div>
+            <input id="downloadDir" type="hidden" />
+            <div class="help-text" id="downloadDirStatus"></div>
+          </div>
+
+          <div class="panel">
+            <h2>数据备份（换设备）</h2>
+            <div class="btn-row">
+              <button class="btn btn-primary" id="btnExportData" type="button">导出备份</button>
+              <button class="btn btn-ghost" id="btnImportData" type="button">导入备份</button>
+            </div>
+            <input id="importDataFile" type="file" accept="application/json,.json" class="hidden" />
+            <div class="help-text" id="backupStatus"></div>
+          </div>
+
+          <div class="panel">
+            <h2>产品信息</h2>
+            <table class="kv">
+              <tr><th>版本</th><td>2.4</td></tr>
+              <tr><th>设计者</th><td><strong>JYJL</strong></td></tr>
+              <tr><th>图标</th><td><code>assets/app-icon.png</code></td></tr>
+              <tr><th>数据</th><td>本机存储；支持导出/导入备份</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <!-- 配置子页：接口 + 该接口模型 -->
+        <div id="settingsEditor" class="hidden">
+          <div class="sub-head">
+            <button type="button" class="btn-back" id="btnSettingsBack">← 返回</button>
+            <h2 id="profileFormTitle">新建接口</h2>
+          </div>
+
+          <div class="panel" id="profileFormPanel">
+            <div id="editBanner" class="note-box hidden" style="margin-top:0">
+              正在<strong>编辑</strong>已有接口的名称 / URL / Key。返回时若未保存会提示。
+              该接口的模型在下方单独管理。
+            </div>
+            <div class="note-box" style="margin-top:10px">
+              <strong>新增接口不会</strong>自动填入模型：请在该接口下手动添加你服务商支持的模型。
+              Base URL 与 API Key 请在你所用服务商的控制台获取。
+            </div>
+            <label class="field" style="margin-top:12px">
+              <div class="label-row"><span>接口名称<span class="req">*</span></span><span class="hint">识别用</span></div>
+              <input id="profileName" type="text" placeholder="例如：我的接口 1" maxlength="40" />
+            </label>
+            <label class="field">
+              <div class="label-row"><span>Base URL<span class="req">*</span></span><span class="hint">无需结尾 /</span></div>
+              <input id="baseUrl" type="url" placeholder="https://api.example.com" />
+            </label>
+            <label class="field">
+              <div class="label-row"><span>API Key<span class="req">*</span></span><span class="hint">本机保存 · 打码显示</span></div>
+              <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+            </label>
+            <div class="btn-row" style="margin-top:4px">
+              <button class="btn btn-primary" id="btnSaveProfile" type="button">保存接口</button>
+              <button class="btn btn-ghost" id="btnResetProfileForm" type="button">清空表单</button>
+            </div>
+            <button class="btn btn-ghost" id="btnTestConn" type="button" style="margin-top:8px">测试连通</button>
+            <div class="help-text" id="connStatus">测试不会生成视频、不扣费：仅探测接口与 Key 是否可用。</div>
+            <div class="help-text" id="profileFormHelp">新建接口会创建一条全新配置（模型为空），不会修改其它接口。</div>
+          </div>
+
+          <div class="panel">
+            <h2>该接口的模型</h2>
+            <div id="modelOwnerBar" class="help-text" style="margin:0 0 8px">选择一个接口后，在此管理它的模型。</div>
+            <label class="field" style="margin-bottom:10px">
+              <div class="label-row"><span>模型所属接口</span><span class="hint">每个接口一套模型</span></div>
+              <select id="modelScopeSelect" aria-label="模型所属接口"></select>
+            </label>
+            <div id="modelList"></div>
+            <button class="btn btn-ghost" id="btnClearModels" type="button">清空该接口模型</button>
+            <div class="help-text">
+              <strong>Agent 模型</strong>：多个接口，每个接口有自己的模型列表，互不影响。
+              新建接口 = 全新空白（模型为空）；编辑接口只改该接口设置/模型。
+              <strong>不会</strong>自动从服务商拉取模型，请手动填写该服务商的模型 ID。
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>添加模型</h2>
+            <div class="note-box" style="margin-top:0" id="addModelTarget">
+              请先在上方「模型所属接口」选择一个接口。
+            </div>
+            <div class="grid2" style="margin-top:12px">
+              <label class="field">
+                <div class="label-row"><span>模型 ID<span class="req">*</span></span><span class="hint">须与接口 model 相同</span></div>
+                <input id="newModelId" type="text" placeholder="与服务商 model 字段完全一致" />
+              </label>
+              <label class="field">
+                <div class="label-row"><span>显示名</span><span class="hint">可与 ID 相同</span></div>
+                <input id="newModelName" type="text" placeholder="默认与模型 ID 相同" />
+              </label>
+            </div>
+            <label class="field">
+              <div class="label-row"><span>类型</span><span class="hint">是否需要参考图</span></div>
+              <select id="newModelType">
+                <option value="i2v">图生视频（需要图片 URL）</option>
+                <option value="t2v">文生视频（不需要图片）</option>
+              </select>
+            </label>
+            <label class="field">
+              <div class="label-row"><span>清晰度与单价</span><span class="hint">每档可不同价</span></div>
+              <input id="newModelPrices" type="text" value="720P=0.5" placeholder="720P=0.5,1080P=1" />
+              <div class="help-text">
+                填写格式：<code>720P=0.5,1080P=1</code>（清晰度=元/秒，价格按你服务商的价目填）。<br/>
+                只有一档时写一项即可，如 <code>720P=0.5</code>。
+              </div>
+            </label>
+            <div class="grid2">
+              <label class="field">
+                <div class="label-row"><span>最短秒</span></div>
+                <input id="newModelMinSec" type="number" min="1" max="120" value="3" />
+              </label>
+              <label class="field">
+                <div class="label-row"><span>最长秒</span></div>
+                <input id="newModelMaxSec" type="number" min="1" max="120" value="15" />
+              </label>
+            </div>
+            <div class="btn-row" style="margin-top:4px">
+              <button class="btn btn-primary" id="btnAddModel" type="button">添加到所选接口</button>
+              <button class="btn btn-ghost hidden" id="btnCancelEditModel" type="button">取消编辑模型</button>
+            </div>
+            <div class="help-text" id="modelFormHelp">点模型列表中的「编辑」可回填并修改；保存后立即生效。</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <nav class="tabs" aria-label="主导航">
+      <label class="tab-btn" for="nt-generate"><span class="ico">▶</span>生成</label>
+      <label class="tab-btn" for="nt-help"><span class="ico">?</span>说明</label>
+      <label class="tab-btn" for="nt-tasks"><span class="ico">☰</span>任务</label>
+      <label class="tab-btn" for="nt-settings"><span class="ico">⚙</span>设置</label>
+      <div class="side-foot">
+        <div class="designer">设计者 JYJL</div>
+        <div>v2.4</div>
+      </div>
+    </nav>
+
+    <div class="toast" id="toast" role="status"></div>
+    <div class="confirm-mask" id="confirmMask" aria-hidden="true">
+      <div class="confirm-box" role="dialog" aria-modal="true">
+        <h3 id="confirmTitle">确认操作</h3>
+        <p id="confirmMsg"></p>
+        <div class="confirm-actions" id="confirmActions">
+          <button type="button" id="confirmCancel">取消</button>
+          <button type="button" class="ok" id="confirmOk">确认</button>
+        </div>
+        <button type="button" id="confirmMid" class="hidden" style="width:100%;margin-top:8px;min-height:40px;border-radius:12px;border:1px solid var(--line);background:#fff;font:inherit;font-size: calc(13px * var(--ui-scale, 1));cursor:pointer">继续编辑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 可选增强：切页时刷新列表；切页本身由 CSS radio 完成，不依赖本脚本 -->
+  <script>
+    function showTab(name) {
+      var radio = document.getElementById("nt-" + (name || "generate"));
+      if (radio) radio.checked = true;
+      if (typeof window.__appOnTab === "function") {
+        try { window.__appOnTab(name || "generate"); } catch (e) {}
+      }
+    }
+    (function () {
+      function bindRadios() {
+        var radios = document.querySelectorAll("input.nav-tab-radio");
+        for (var i = 0; i < radios.length; i++) {
+          radios[i].addEventListener("change", function () {
+            var name = (this.id || "").replace(/^nt-/, "");
+            if (typeof window.__appOnTab === "function") {
+              try { window.__appOnTab(name); } catch (e) {}
+            }
+          });
+        }
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", bindRadios);
+      } else {
+        bindRadios();
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
+      "use strict";
+
+      /**
+       * Agent 结构（严格隔离）：
+       * profiles[] 每项独立 { id, name, baseUrl, apiKey, models[], selectedModelId }
+       * - 新建接口：push 全新项，models=[]，绝不修改其它项
+       * - 编辑接口：只改该 id 的 name/baseUrl/apiKey；模型另区管理
+       * - 模型 CRUD：只作用于 modelOwnerProfileId 指向的那一个接口
+       * - 不自动拉取服务商模型
+       */
+      var ENDPOINT = "/v1/video/generations";
+      var POLL = {
+        url_candidates: ["data.result_url", "result_url", "data.video_url", "video_url", "data.url", "url"],
+        status_candidates: ["data.status", "status", "data.task_status", "task_status", "data.state", "state"],
+        id_candidates: ["task_id", "data.task_id", "data.id", "id", "data.taskId", "taskId"],
+        fail_candidates: ["data.fail_reason", "fail_reason", "data.error", "error", "data.message", "message"],
+        success_values: ["SUCCESS", "SUCCEEDED", "SUCCESSFUL", "COMPLETED", "success", "succeeded", "completed"],
+        failure_values: ["FAILURE", "FAILED", "ERROR", "CANCELLED", "failure", "failed", "error"]
+      };
+
+      function uid(prefix) {
+        return (prefix || "id") + "_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+      }
+      function maskKey(key) {
+        var k = String(key || "");
+        if (!k) return "（未填写）";
+        if (k.length <= 8) return "****";
+        return k.slice(0, 4) + "…" + k.slice(-4);
+      }
+      function loadJson(key, fallback) {
+        try {
+          var raw = localStorage.getItem(key);
+          if (!raw) return JSON.parse(JSON.stringify(fallback));
+          return JSON.parse(raw);
+        } catch (e) { return JSON.parse(JSON.stringify(fallback)); }
+      }
+      function saveJson(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+      function normalizeBaseUrl(u) { return String(u || "").trim().replace(/\/+$/, ""); }
+      function money(n) { return "¥" + (Math.round(n * 100) / 100).toFixed(2); }
+      function escapeHtml(s) {
+        return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+      }
+      function escapeAttr(s) { return escapeHtml(s).replace(/'/g, "&#39;"); }
+
+      function defaultState() {
+        return {
+          profiles: [],
+          activeProfileId: null,
+          modelOwnerProfileId: null,
+          boundProfileId: null,
+          formMode: "create",
+          pendingModels: [],
+          editingProfileId: null,
+          mock: true,
+          tasks: [],
+          pollTimers: {},
+          size: "720P",
+          seconds: 5,
+          tab: "generate",
+          imageMode: "file",
+          imageDataUrl: null,
+          imageFileName: ""
+        };
+      }
+
+      function normalizeProfileModels(p) {
+        if (!p) return p;
+        if (!Array.isArray(p.models)) p.models = [];
+        // 显示名与接入 model 名对齐，避免分不清
+        p.models.forEach(function (m) {
+          if (m && m.id && !m.name) {
+            m.name = m.id;
+          }
+        });
+        if (!p.selectedModelId || !p.models.some(function (m) { return m && m.id === p.selectedModelId; })) {
+          p.selectedModelId = p.models[0] ? p.models[0].id : null;
+        }
+        return p;
+      }
+
+      function migrateState() {
+        var s = defaultState();
+        var legacy = loadJson("aiv_cfg", null);
+        if (legacy && typeof legacy === "object" && Array.isArray(legacy.profiles)) {
+          s.profiles = legacy.profiles.filter(function (p) { return p && p.id; });
+          s.profiles.forEach(normalizeProfileModels);
+          s.activeProfileId = legacy.activeProfileId || (s.profiles[0] && s.profiles[0].id) || null;
+          if (typeof legacy.mock === "boolean") s.mock = legacy.mock;
+        } else if (legacy && (legacy.baseUrl || legacy.apiKey)) {
+          var p = {
+            id: uid("prof"),
+            name: "默认配置",
+            baseUrl: normalizeBaseUrl(legacy.baseUrl),
+            apiKey: String(legacy.apiKey || ""),
+            models: Array.isArray(legacy.customModels) && legacy.customModels.length
+              ? legacy.customModels.slice()
+              : [],
+            selectedModelId: null,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          };
+          normalizeProfileModels(p);
+          s.profiles = [p];
+          s.activeProfileId = p.id;
+        }
+        var tasks = loadJson("aiv_tasks", []);
+        if (Array.isArray(tasks)) s.tasks = tasks;
+        // 若历史数据里接口被自动塞过默认模型，保留用户已看到的列表，不强制清空
+        return s;
+      }
+
+      var state = migrateState();
+      var el = {};
+
+      function stateHasKey(ps) {
+        return !!(ps || []).some(function (p) { return p && String(p.apiKey || "").trim(); });
+      }
+
+      function persist() {
+        saveJson("aiv_cfg", {
+          profiles: state.profiles,
+          activeProfileId: state.activeProfileId,
+          mock: state.mock
+        });
+        saveJson("aiv_tasks", state.tasks);
+        // 桌面端：同步写到本机 data\app-state.json，重启不丢
+        try {
+          if (hasDesktopApi() && typeof window.pywebview.api.save_app_state === "function") {
+            if (!stateHasKey(state.profiles) && window.__hostHadKey) return;
+            window.pywebview.api.save_app_state({
+              aiv_cfg: {
+                profiles: state.profiles,
+                activeProfileId: state.activeProfileId,
+                mock: state.mock
+              },
+              aiv_tasks: state.tasks,
+              aiv_download_dir: getDownloadDir()
+            });
+          }
+        } catch (e) {}
+      }
+
+      async function restoreFromHostFile() {
+        if (!hasDesktopApi() || typeof window.pywebview.api.get_app_state !== "function") return false;
+        try {
+          var st = await window.pywebview.api.get_app_state();
+          if (!st || (!st.aiv_cfg && !st.aiv_tasks)) return false;
+          var cfgRaw = localStorage.getItem("aiv_cfg");
+          var taskRaw = localStorage.getItem("aiv_tasks");
+          var cfgEmpty = !cfgRaw || cfgRaw === "null" || cfgRaw === "{}";
+          var taskEmpty = !taskRaw || taskRaw === "null" || taskRaw === "[]";
+          var cfgObj = null;
+          try { cfgObj = cfgRaw ? JSON.parse(cfgRaw) : null; } catch (e) { cfgObj = null; }
+          var hasLocalKey = !!(cfgObj && Array.isArray(cfgObj.profiles) && cfgObj.profiles.some(function (p) {
+            return p && String(p.apiKey || "").trim();
+          }));
+          var hasHostKey = !!(st.aiv_cfg && Array.isArray(st.aiv_cfg.profiles) && st.aiv_cfg.profiles.some(function (p) {
+            return p && String(p.apiKey || "").trim();
+          }));
+          window.__hostHadKey = hasHostKey;
+          var should = (cfgEmpty && taskEmpty) || (!hasLocalKey && hasHostKey);
+          if (hasHostKey && !hasLocalKey) should = true;
+          if (!should) return false;
+          if (st.aiv_cfg) saveJson("aiv_cfg", st.aiv_cfg);
+          if (Array.isArray(st.aiv_tasks) && st.aiv_tasks.length) saveJson("aiv_tasks", st.aiv_tasks);
+          if (st.aiv_download_dir) {
+            try { localStorage.setItem("aiv_download_dir", String(st.aiv_download_dir)); } catch (e) {}
+          }
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function scheduleRestoreAndRender() {
+        Promise.resolve(restoreFromHostFile()).then(function (restored) {
+          if (restored) {
+            state = migrateState();
+            fillProfileForm(null);
+            if (el.mockMode) el.mockMode.checked = !!state.mock;
+            refreshGenerateChrome();
+            renderAllSettings();
+            renderTasks();
+            persist();
+            toast("已从本机 data 恢复配置", "ok");
+          }
+        }).catch(function () {});
+      }
+
+      window.addEventListener("pywebviewready", function () {
+        try { ensureDesktopDownloadDir(); } catch (e) {}
+        scheduleRestoreAndRender();
+      });
+
+      function findProfile(id) {
+        for (var i = 0; i < state.profiles.length; i++) {
+          if (state.profiles[i].id === id) return state.profiles[i];
+        }
+        return null;
+      }
+
+      function activeProfile() {
+        return findProfile(state.activeProfileId) || state.profiles[0] || null;
+      }
+
+      /**
+       * formMode:
+       *   "create" — 新建接口表单：模型区强制为空，添加进 pendingModels
+       *   "profile" — 绑定 boundProfileId：设置与模型都只属于该接口
+       */
+      function isCreateForm() {
+        return state.formMode !== "profile";
+      }
+
+      function boundProfile() {
+        if (state.formMode !== "profile") return null;
+        return findProfile(state.boundProfileId) || null;
+      }
+
+      function modelOwnerProfile() {
+        // 新建表单：没有“已有接口”作为模型宿主
+        if (isCreateForm()) return null;
+        return boundProfile();
+      }
+
+      function profileModels(p) {
+        if (!p) return [];
+        normalizeProfileModels(p);
+        return p.models || [];
+      }
+
+      function activeModels() { return profileModels(activeProfile()); }
+
+      function activeModel() {
+        var p = activeProfile();
+        if (!p) return null;
+        var models = profileModels(p);
+        if (!models.length) return null;
+        var id = p.selectedModelId;
+        for (var i = 0; i < models.length; i++) {
+          if (models[i].id === id) return models[i];
+        }
+        return models[0];
+      }
+
+      function getModelInProfile(p, id) {
+        var models = profileModels(p);
+        for (var i = 0; i < models.length; i++) {
+          if (models[i].id === id) return models[i];
+        }
+        return null;
+      }
+
+      function setActiveModelId(id) {
+        var p = activeProfile();
+        if (p) {
+          p.selectedModelId = id;
+          persist();
+        }
+      }
+
+      function currentBaseUrl() {
+        var p = activeProfile();
+        return normalizeBaseUrl((p && p.baseUrl) || "");
+      }
+      function currentApiKey() {
+        var p = activeProfile();
+        return String((p && p.apiKey) || "").trim();
+      }
+      function isMock() { return !!state.mock; }
+      function unitPrice(model, size) {
+        var map = (model && model.prices) || {};
+        return map[size] || map[model && model.defaultSize] || 0;
+      }
+
+      /** 接口连通测试：不生成视频、不扣费。探测 /v1/models 与 Base URL。 */
+      function testConnection(profileOrNull) {
+        var base, key, label;
+        if (profileOrNull) {
+          base = normalizeBaseUrl(profileOrNull.baseUrl);
+          key = String(profileOrNull.apiKey || "").trim();
+          label = profileOrNull.name || "接口";
+        } else {
+          // 配置页只测当前表单，绝不回退到其它接口
+          base = normalizeBaseUrl(el.baseUrl ? el.baseUrl.value.trim() : "");
+          key = String(el.apiKey ? el.apiKey.value.trim() : "").trim();
+          label = (el.profileName && el.profileName.value.trim()) || "当前表单";
+          if (!base) {
+            if (el.connStatus) {
+              el.connStatus.textContent = "请先填写 Base URL（不会使用其它接口）";
+              el.connStatus.style.color = "var(--warn)";
+            }
+            toast("请先填写 Base URL 再测试连通", "err");
+            return;
+          }
+        }
+        if (!base) {
+          toast("请先填写 Base URL", "err");
+          return;
+        }
+        if (el.connStatus) {
+          el.connStatus.textContent = "正在测试：" + base + " …";
+        }
+        toast("开始测试连通（不生成视频）", null);
+        var t0 = Date.now();
+
+        function finish(ok, text) {
+          var ms = Date.now() - t0;
+          var line = text + " · " + ms + "ms";
+          if (el.connStatus) {
+            el.connStatus.textContent = line;
+            el.connStatus.style.color = ok ? "var(--ok)" : "var(--warn)";
+          }
+          toast(line, ok ? "ok" : "err");
+        }
+
+        function req(url, useAuth) {
+          var headers = { "Accept": "application/json, text/plain, */*" };
+          if (useAuth && key) headers["Authorization"] = "Bearer " + key;
+          var opts = { method: "GET", headers: headers, mode: "cors", cache: "no-store" };
+          try {
+            if (typeof AbortSignal !== "undefined" && AbortSignal.timeout) {
+              opts.signal = AbortSignal.timeout(8000);
+            }
+          } catch (e) {}
+          return fetch(url, opts).then(function (r) {
+            return r.text().then(function (t) {
+              var j = null;
+              try { j = t ? JSON.parse(t) : null; } catch (e) {}
+              return { status: r.status, ok: r.ok, text: t, json: j };
+            });
+          });
+        }
+
+        // 优先 /v1/models（带 Key），失败再探 Base URL
+        req(base + "/v1/models", true)
+          .then(function (r) {
+            if (r.status === 401 || r.status === 403) {
+              finish(false, "网络可达，Key 无效或无权限（HTTP " + r.status + "）· " + label);
+              return;
+            }
+            if (r.ok) {
+              var n = 0;
+              try {
+                if (r.json && Array.isArray(r.json.data)) n = r.json.data.length;
+                else if (r.json && Array.isArray(r.json.models)) n = r.json.models.length;
+              } catch (e) {}
+              finish(true, "连通正常 · Key 可用 · 模型列表 " + (n ? n + " 条" : "已返回") + " · " + label);
+              return;
+            }
+            // /v1/models 不一定存在，再探根地址
+            return req(base + "/", false).then(function (r2) {
+              if (r2.status === 401 || r2.status === 403) {
+                finish(false, "网络可达，鉴权失败（HTTP " + r2.status + "）· " + label);
+                return;
+              }
+              if (r2.ok || r2.status === 404 || r2.status === 405) {
+                finish(true, "地址可达（HTTP " + r2.status + "）· 建议再测模型 ID · " + label);
+                return;
+              }
+              finish(false, "HTTP " + r.status + " / " + r2.status + " · 请检查 Base URL · " + label);
+            });
+          })
+          .catch(function () {
+            return req(base + "/", false)
+              .then(function (r2) {
+                finish(true, "地址可达（HTTP " + r2.status + "）· 模型列表接口可能不支持 · " + label);
+              })
+              .catch(function (e) {
+                finish(false, "无法连接：" + String(e && e.message ? e.message : e) + " · " + label);
+              });
+          });
+      }
+
+      function toast(msg, type) {
+        el.toast.textContent = msg;
+        el.toast.className = "toast show" + (type ? " " + type : "");
+        clearTimeout(toast._t);
+        toast._t = setTimeout(function () { el.toast.className = "toast"; }, 2600);
+      }
+
+      function askConfirm3(title, message, okText, discardText) {
+        // ok=保存并退出；cancel=取消保存并退出；mid=继续编辑
+        return new Promise(function (resolve) {
+          if (!el.confirmMask) { resolve("stay"); return; }
+          el.confirmTitle.textContent = title || "确认操作";
+          el.confirmMsg.textContent = message || "";
+          el.confirmOk.textContent = okText || "保存并退出";
+          el.confirmCancel.textContent = discardText || "取消保存并退出";
+          if (el.confirmMid) {
+            el.confirmMid.textContent = "继续编辑";
+            el.confirmMid.classList.remove("hidden");
+          }
+          el.confirmMask.classList.add("show");
+          el.confirmMask.setAttribute("aria-hidden", "false");
+          function cleanup(result) {
+            el.confirmOk.onclick = el.confirmCancel.onclick = null;
+            if (el.confirmMid) el.confirmMid.onclick = null;
+            el.confirmMask.onclick = null;
+            el.confirmMask.classList.remove("show");
+            el.confirmMask.setAttribute("aria-hidden", "true");
+            if (el.confirmMid) el.confirmMid.classList.add("hidden");
+            resolve(result);
+          }
+          el.confirmOk.onclick = function () { cleanup("save"); };
+          el.confirmCancel.onclick = function () { cleanup("discard"); };
+          if (el.confirmMid) el.confirmMid.onclick = function () { cleanup("stay"); };
+          el.confirmMask.onclick = function (e) { if (e.target === el.confirmMask) cleanup("stay"); };
+        });
+      }
+
+      function askConfirm(title, message, okText) {
+        return new Promise(function (resolve) {
+          el.confirmTitle.textContent = title || "确认操作";
+          el.confirmMsg.textContent = message || "";
+          el.confirmOk.textContent = okText || "确认";
+          el.confirmMask.classList.add("show");
+          el.confirmMask.setAttribute("aria-hidden", "false");
+          function cleanup(result) {
+            el.confirmMask.classList.remove("show");
+            el.confirmMask.setAttribute("aria-hidden", "true");
+            el.confirmOk.onclick = el.confirmCancel.onclick = el.confirmMask.onclick = null;
+            resolve(result);
+          }
+          el.confirmOk.onclick = function () { cleanup(true); };
+          el.confirmCancel.onclick = function () { cleanup(false); };
+          el.confirmMask.onclick = function (e) { if (e.target === el.confirmMask) cleanup(false); };
+        });
+      }
+
+      function truncate(s, n) {
+        s = String(s == null ? "" : s);
+        return s.length > n ? s.slice(0, n - 1) + "…" : s;
+      }
+
+      /** 首页模型下拉：与接入的 model 名一致 + 图生/文生 */
+      function modelShortLabel(m) {
+        if (!m) return "—";
+        var t = m.type === "t2v" ? "文生" : "图生";
+        var name = m.id || m.name || "未命名";
+        return name + " · " + t;
+      }
+
+      function updateModePill() {
+        var p = activeProfile();
+        var m = activeModel();
+        if (state.mock) {
+          el.modePill.textContent = "演示模式";
+          el.modePill.classList.add("mock");
+        } else if (!p) {
+          el.modePill.textContent = "未配置";
+          el.modePill.classList.add("mock");
+        } else if (!currentApiKey()) {
+          el.modePill.textContent = "未填 Key";
+          el.modePill.classList.add("mock");
+        } else {
+          el.modePill.textContent = truncate(p.name, 10);
+          el.modePill.classList.remove("mock");
+        }
+        el.brandSub.textContent =
+          (state.mock ? "演示中 · " : "") +
+          (p ? truncate(p.name, 12) : "无接口") + (m ? " · " + truncate(m.id || m.name, 18) : "");
+      }
+
+      function renderProfileSelect() {
+        var html = "";
+        if (!state.profiles.length) {
+          html += '<option value="">（暂无接口）</option>';
+        } else {
+          state.profiles.forEach(function (p) {
+            var n = profileModels(p).length;
+            var active = p.id === state.activeProfileId;
+            // 首页接口下拉：只显示接口名
+            var label = truncate(p.name, 18);
+            html += '<option value="' + escapeAttr(p.id) + '"' + (active ? " selected" : "") + ">" +
+              escapeHtml(label) + "</option>";
+          });
+        }
+        el.profileSelect.innerHTML = html;
+        if (state.activeProfileId) el.profileSelect.value = state.activeProfileId;
+        var p = activeProfile();
+        if (!p) {
+          el.profileSelectHelp.textContent = "还没有接口，可到设置创建。";
+        } else {
+          var models = profileModels(p);
+          el.profileSelectHelp.innerHTML =
+            "<span class=\"mono-line\">" + escapeHtml(truncate(p.baseUrl, 40)) + "</span><br/>" +
+            "模型 " + models.length + " 个" +
+            (models.length ? "" : "（到设置添加）") +
+            " · Key " + escapeHtml(maskKey(p.apiKey));
+        }
+      }
+
+      function renderModelOptions() {
+        var p = activeProfile();
+        var models = profileModels(p);
+        var html = "";
+        if (!models.length) {
+          html += '<option value="">（暂无模型）</option>';
+          el.modelSelect.innerHTML = html;
+          el.modelSelect.disabled = true;
+          el.noModelBanner.classList.remove("hidden");
+          el.modelHelp.textContent = "请到设置 →「" + truncate(p ? p.name : "接口", 12) + "」→「模型」添加。";
+          el.btnGenerate.disabled = true;
+          applyModelToForm(null);
+          updateModePill();
+          return;
+        }
+
+        el.modelSelect.disabled = false;
+        el.noModelBanner.classList.add("hidden");
+        el.btnGenerate.disabled = false;
+
+        models.forEach(function (m) {
+          html += '<option value="' + escapeAttr(m.id) + '">' + escapeHtml(modelShortLabel(m)) + "</option>";
+        });
+        el.modelSelect.innerHTML = html;
+
+        var current = activeModel();
+        if (current) el.modelSelect.value = current.id;
+        applyModelToForm(current);
+        updateModePill();
+      }
+
+      function setImageStatus(msg, type) {
+        if (!el.imageStatus) return;
+        el.imageStatus.textContent = msg || "";
+        el.imageStatus.className = "help-text" + (type ? " " + type : "");
+      }
+
+      function renderImageMode() {
+        var isFile = state.imageMode !== "url";
+        if (el.imageFileBox) el.imageFileBox.classList.toggle("hidden", !isFile);
+        if (el.imageUrlBox) el.imageUrlBox.classList.toggle("hidden", isFile);
+        if (el.imageModeSeg) {
+          Array.prototype.forEach.call(el.imageModeSeg.querySelectorAll("button[data-imode]"), function (b) {
+            b.classList.toggle("active", b.getAttribute("data-imode") === (isFile ? "file" : "url"));
+          });
+        }
+      }
+
+      function compressImageFile(file, maxSide, quality) {
+        return new Promise(function (resolve, reject) {
+          if (!file || !file.type || file.type.indexOf("image/") !== 0) {
+            reject(new Error("请选择图片文件"));
+            return;
+          }
+          resolve(compressImageFromSrc(URL.createObjectURL(file), maxSide, quality, true));
+        }).then(function (p) { return p; });
+      }
+
+      function compressImageFromSrc(src, maxSide, quality, revoke) {
+        return new Promise(function (resolve, reject) {
+          var img = new Image();
+          img.onload = function () {
+            try {
+              var w = img.naturalWidth || img.width;
+              var h = img.naturalHeight || img.height;
+              var scale = 1;
+              var mx = maxSide || 1280;
+              if (Math.max(w, h) > mx) scale = mx / Math.max(w, h);
+              var cw = Math.max(1, Math.round(w * scale));
+              var ch = Math.max(1, Math.round(h * scale));
+              var canvas = document.createElement("canvas");
+              canvas.width = cw;
+              canvas.height = ch;
+              var ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0, cw, ch);
+              var q = quality || 0.85;
+              var dataUrl = canvas.toDataURL("image/jpeg", q);
+              if (revoke) { try { URL.revokeObjectURL(src); } catch (e) {} }
+              resolve(dataUrl);
+            } catch (e) {
+              if (revoke) { try { URL.revokeObjectURL(src); } catch (e2) {} }
+              reject(e);
+            }
+          };
+          img.onerror = function () {
+            if (revoke) { try { URL.revokeObjectURL(src); } catch (e2) {} }
+            reject(new Error("图片读取失败"));
+          };
+          img.src = src;
+        });
+      }
+
+      function compressImageDataUrl(dataUrl, maxSide, quality) {
+        return compressImageFromSrc(dataUrl, maxSide, quality, false);
+      }
+
+      /** 安卓：系统相册 / 文件选择器（必要时已由原生申请照片权限） */
+      async function pickImageFromSystem() {
+        var p = aivDirPlugin();
+        if (!p || typeof p.pickImage !== "function") {
+          if (el.imageFile) el.imageFile.click();
+          return;
+        }
+        setImageStatus("正在打开系统相册 / 文件…", null);
+        try {
+          var r = await p.pickImage();
+          if (!r || !r.ok) {
+            if (r && r.cancelled) {
+              setImageStatus("未选择图片", null);
+              return;
+            }
+            setImageStatus((r && r.error) || "选择图片失败", "err");
+            toast((r && r.error) || "选择图片失败", "err");
+            return;
+          }
+          setImageStatus("正在处理图片…", null);
+          var dataUrl = await compressImageDataUrl(r.dataUrl, 1280, 0.85);
+          state.imageDataUrl = dataUrl;
+          state.imageFileName = r.name || "local-image";
+          state.imageMode = "file";
+          renderImageMode();
+          if (el.imagePreview) {
+            el.imagePreview.src = dataUrl;
+            el.imagePreview.classList.remove("hidden");
+          }
+          var kb = Math.round(dataUrl.length * 0.75 / 1024);
+          setImageStatus("已就绪：" + (r.name || "图片") + "（约 " + kb + " KB）", "ok");
+        } catch (e) {
+          setImageStatus(String(e && e.message ? e.message : e), "err");
+          toast("图片处理失败", "err");
+        }
+      }
+
+      function currentImageRef() {
+        if (state.imageMode === "url") {
+          return (el.imageUrl && el.imageUrl.value.trim()) || null;
+        }
+        return state.imageDataUrl || null;
+      }
+
+      function applyModelToForm(model) {
+        if (!model) {
+          if (el.imageField) el.imageField.classList.add("hidden");
+          el.sizeSeg.innerHTML = "";
+          el.costValue.textContent = "—";
+          el.costFormula.textContent = "请先选择接口与模型";
+          el.costMeta.textContent = "";
+          el.secondsHint.textContent = "—";
+          el.modelHelp.textContent = "当前接口还没有模型。";
+          return;
+        }
+        var isI2v = model.type !== "t2v";
+        if (el.imageField) {
+          el.imageField.classList.toggle("hidden", !isI2v);
+        }
+        if (el.imageReq) {
+          el.imageReq.classList.toggle("hidden", !isI2v);
+          el.imageReq.style.display = isI2v ? "" : "none";
+        }
+        if (el.imageHint) el.imageHint.textContent = isI2v ? "必填" : "当前模型不需要";
+        if (el.imageHelp) {
+          el.imageHelp.textContent = isI2v
+            ? "图生必须有图：可本地上传，或粘贴 HTTPS 图片链接。"
+            : "文生模型不需要参考图。";
+        }
+        if (isI2v) renderImageMode();
+        var typeLabel = isI2v ? "图生 · 需图" : "文生 · 无需图";
+        el.modelHelp.innerHTML =
+          "<span class=\"mono-line\">" + escapeHtml(model.id) + "</span>" +
+          (model.name && model.name !== model.id ? "（" + escapeHtml(model.name) + "）" : "") +
+          " · " + escapeHtml(typeLabel) +
+          " · 时长 " + escapeHtml((model.minSec || 3) + "-" + (model.maxSec || 15) + "s") +
+          " · 清晰度在下方选择";
+
+        var sizes = model.sizes && model.sizes.length ? model.sizes : ["720P"];
+        if (sizes.indexOf(state.size) < 0) state.size = model.defaultSize || sizes[0];
+        var html = "";
+        sizes.forEach(function (s) {
+          html += '<button type="button" data-size="' + escapeAttr(s) + '"' +
+            (s === state.size ? ' class="active"' : "") + ">" + escapeHtml(s) + "</button>";
+        });
+        el.sizeSeg.innerHTML = html;
+
+        var min = model.minSec || 3;
+        var max = model.maxSec || 15;
+        if (state.seconds < min || state.seconds > max) state.seconds = model.defaultSec || min;
+        el.seconds.min = String(min);
+        el.seconds.max = String(max);
+        el.seconds.value = String(state.seconds);
+        el.secondsHint.textContent = min + " ~ " + max + " 秒";
+        updateCost();
+      }
+
+      function updateCost() {
+        var p = activeProfile();
+        var model = activeModel();
+        if (!p || !model) {
+          el.costValue.textContent = "—";
+          el.costFormula.textContent = "请先选择接口与模型";
+          el.costMeta.textContent = "";
+          return;
+        }
+        var price = unitPrice(model, state.size);
+        var cost = price * state.seconds;
+        el.secondsVal.textContent = state.seconds + "s";
+        el.costValue.textContent = money(cost);
+        el.costFormula.textContent = state.seconds + "s × " + money(price) + "/秒";
+        el.costMeta.textContent = truncate(p.name, 12) + " · " + truncate(model.id || model.name, 20) + " · " + state.size +
+          (isMock() ? " · 演示" : "");
+      }
+
+      function renderProfiles() {
+        var host = el.configuredList || el.profileList;
+        if (!host) return;
+        if (!state.profiles.length) {
+          host.innerHTML = '<div class="empty">还没有接口。点「添加接口」新建。</div>';
+          return;
+        }
+        var html = "";
+        state.profiles.forEach(function (p) {
+          normalizeProfileModels(p);
+          var active = p.id === state.activeProfileId;
+          var models = p.models || [];
+          html += '<div class="configured-item' + (active ? " active" : "") + '" data-id="' + escapeAttr(p.id) + '">';
+          html += '<div class="top" style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">';
+          html += "<div>";
+          html += '<p class="name">' + escapeHtml(truncate(p.name, 22)) + "</p>";
+          html += '<p class="meta">' + escapeHtml(truncate(p.baseUrl, 40)) + " · Key " + escapeHtml(maskKey(p.apiKey)) + "</p>";
+          if (models.length) {
+            html += '<p class="meta">已配置模型 ' + models.length + "：</p>";
+            models.forEach(function (m) {
+              html += '<p class="meta">· ' + escapeHtml(m.id || m.name) + "（" + (m.type === "t2v" ? "文生" : "图生") + "）</p>";
+            });
+          } else {
+            html += '<p class="meta">已配置模型：无（请点配置添加）</p>';
+          }
+          html += "</div>";
+          if (active) html += '<span class="badge">使用中</span>';
+          html += "</div>";
+          html += '<div class="profile-actions">';
+          if (!active) html += '<button type="button" class="primary" data-pact="use">使用</button>';
+          html += '<button type="button" data-pact="edit">配置</button>';
+          html += '<button type="button" class="danger" data-pact="del">删除</button>';
+          html += "</div></div>";
+        });
+        host.innerHTML = html;
+      }
+
+      function fillProfileForm(profile) {
+        if (profile) {
+          state.formMode = "profile";
+          state.boundProfileId = profile.id;
+          state.editingProfileId = profile.id;
+          state.modelOwnerProfileId = profile.id;
+          state.pendingModels = [];
+          el.profileFormTitle.textContent = "编辑接口：" + profile.name;
+          el.editBanner.classList.remove("hidden");
+          el.btnSaveProfile.textContent = "保存修改";
+          el.btnResetProfileForm.textContent = "取消编辑";
+          el.profileFormHelp.textContent = "下方模型区只属于「" + profile.name + "」。取消编辑仅退出，不新建。";
+          el.profileName.value = profile.name || "";
+          el.baseUrl.value = profile.baseUrl || "";
+          el.apiKey.value = profile.apiKey || "";
+        } else {
+          // 新建：模型区强制空白，可添加（暂存），保存时写入新接口
+          state.formMode = "create";
+          state.boundProfileId = null;
+          state.editingProfileId = null;
+          state.pendingModels = [];
+          el.profileFormTitle.textContent = "新建接口";
+          el.editBanner.classList.add("hidden");
+          el.btnSaveProfile.textContent = "保存接口";
+          el.btnResetProfileForm.textContent = "清空表单";
+          el.profileFormHelp.textContent = "新建：下方模型区为空，可直接添加；保存后写入这条新接口，不会动其它接口。";
+          el.profileName.value = "";
+          el.baseUrl.value = "";
+          el.apiKey.value = "";
+        }
+        if (el.mockMode) el.mockMode.checked = !!state.mock;
+        if (el.btnFillDemo) el.btnFillDemo.disabled = !state.mock;
+        clearSettingsDirty();
+        renderModelScopeSelect();
+        renderModelManagement();
+      }
+
+      function cancelEdit() {
+        // 有内容/在编辑：走返回（可保存退出或取消保存退出）；无内容才清空表单
+        var hasContent = settingsDirty ||
+          (state.formMode === "profile" && !!state.editingProfileId) ||
+          (el.profileName && el.profileName.value) ||
+          (el.baseUrl && el.baseUrl.value) ||
+          (el.apiKey && el.apiKey.value) ||
+          (state.pendingModels || []).length ||
+          editingModelId;
+        if (hasContent) {
+          leaveSettingsEditor();
+          return;
+        }
+        fillProfileForm(null);
+        resetModelForm();
+        toast("表单已清空", "ok");
+      }
+
+      function saveProfile() {
+        var name = el.profileName.value.trim();
+        var base = normalizeBaseUrl(el.baseUrl.value);
+        var key = el.apiKey.value.trim();
+        if (!name) { toast("请填写接口名称", "err"); el.profileName.focus(); return false; }
+        if (!base) { toast("请填写 Base URL", "err"); el.baseUrl.focus(); return false; }
+        if (!/^https?:\/\//i.test(base)) { toast("Base URL 需以 http(s):// 开头", "err"); el.baseUrl.focus(); return false; }
+
+        var now = Date.now();
+        var targetId = state.formMode === "profile" ? state.boundProfileId : null;
+
+        if (targetId && state.editingProfileId) {
+          var edited = findProfile(state.editingProfileId);
+          if (!edited) { toast("编辑目标不存在，请取消编辑后重试", "err"); return false; }
+          edited.name = name;
+          edited.baseUrl = base;
+          if (key) edited.apiKey = key;
+          edited.updatedAt = now;
+          state.activeProfileId = edited.id;
+          state.modelOwnerProfileId = edited.id;
+          state.editingProfileId = null;
+          persist();
+          // 保存后仍绑在该接口，模型区继续只显示它
+          fillProfileForm(edited);
+          renderAllSettings();
+          refreshGenerateChrome();
+          clearSettingsDirty();
+          toast("已保存接口设置：" + name + "（模型未改动）", "ok");
+          doLeaveSettingsEditor(false);
+          return true;
+        }
+
+        if (!key) { toast("请填写 API Key", "err"); el.apiKey.focus(); return false; }
+
+        var dupName = state.profiles.some(function (p) { return p.name === name; });
+        var dupUrl = state.profiles.some(function (p) { return normalizeBaseUrl(p.baseUrl) === base; });
+        if (dupName) { toast("接口名称已存在，请换名称，或编辑已有接口", "err"); return false; }
+        if (dupUrl) { toast("该 Base URL 已有接口，请换地址，或编辑已有接口", "err"); return false; }
+
+        var pending = (state.pendingModels || []).map(function (m) { return JSON.parse(JSON.stringify(m)); });
+        var np = {
+          id: uid("prof"),
+          name: name,
+          baseUrl: base,
+          apiKey: key,
+          models: pending, // 新建时添加的模型只进这一条；不碰其它接口
+          selectedModelId: pending[0] ? pending[0].id : null,
+          isDefaultSeed: false,
+          createdAt: now,
+          updatedAt: now
+        };
+        state.profiles.push(np);
+        state.activeProfileId = np.id;
+        state.modelOwnerProfileId = np.id;
+        state.pendingModels = [];
+        state.editingProfileId = null;
+        persist();
+        // 保存后进入「该接口」的管理视图（模型区 = 这条新接口）
+        fillProfileForm(np);
+        renderAllSettings();
+        refreshGenerateChrome();
+        clearSettingsDirty();
+        toast("已新建接口：" + name + "（模型 " + np.models.length + " 个，仅属于此接口）", "ok");
+        doLeaveSettingsEditor(false);
+        return true;
+      }
+
+      function renderModelScopeSelect() {
+        if (!el.modelScopeSelect) return;
+        if (isCreateForm()) {
+          el.modelScopeSelect.innerHTML = '<option value="__create__">新建中（模型区为空）</option>';
+          el.modelScopeSelect.value = "__create__";
+          el.modelScopeSelect.disabled = true;
+          return;
+        }
+        el.modelScopeSelect.disabled = false;
+        var currentId = state.boundProfileId || state.modelOwnerProfileId || "";
+        var html = "";
+        state.profiles.forEach(function (p) {
+          normalizeProfileModels(p);
+          var n = (p.models || []).length;
+          html += '<option value="' + escapeAttr(p.id) + '"' + (p.id === currentId ? " selected" : "") + ">" +
+            escapeHtml(truncate(p.name, 16) + " · " + n + " 个模型") + "</option>";
+        });
+        el.modelScopeSelect.innerHTML = html;
+        if (currentId) el.modelScopeSelect.value = currentId;
+      }
+
+      function renderModelListFrom(models, emptyHtml) {
+        if (!models.length) {
+          el.modelList.innerHTML = emptyHtml;
+          return;
+        }
+        var html = "";
+        models.forEach(function (m) {
+          var sizes = (m.sizes || []).join("/");
+          var prices = [];
+          (m.sizes || []).forEach(function (s) { prices.push(s + " " + money(unitPrice(m, s)) + "/s"); });
+          html += '<div class="model-item">';
+          html += '<p class="name">' + escapeHtml(m.id || m.name) + "</p>";
+          if (m.name && m.name !== m.id) {
+            html += '<p class="meta">显示名：' + escapeHtml(m.name) + "</p>";
+          }
+          html += '<p class="meta">' + (m.type === "t2v" ? "文生" : "图生") + " · " + escapeHtml(sizes) + "</p>";
+          html += '<p class="meta">' + escapeHtml(prices.join(" · ")) + " · " + (m.minSec || 3) + "-" + (m.maxSec || 15) + "s</p>";
+          html += '<div class="profile-actions">';
+          html += '<button type="button" data-mact="edit" data-id="' + escapeAttr(m.id) + '">编辑</button>';
+          html += '<button type="button" class="danger" data-mact="del" data-id="' +
+            escapeAttr(m.id) + '">删除</button>';
+          html += "</div>";
+          html += "</div>";
+        });
+        el.modelList.innerHTML = html;
+      }
+
+      function renderModelManagement() {
+        renderModelScopeSelect();
+
+        // ===== 新建接口：模型区强制为空，绝不显示其它接口的模型 =====
+        if (isCreateForm()) {
+          var pending = state.pendingModels || [];
+          el.modelOwnerBar.textContent = "新建接口 · 模型区为空（可直接添加，保存时写入新接口）";
+          el.addModelTarget.textContent = "将添加到：尚未保存的新接口（不会写入其它接口）";
+          el.btnClearModels.disabled = false;
+          el.btnAddModel.disabled = false;
+          renderModelListFrom(pending,
+            '<div class="empty"><strong>新建接口：模型区为空</strong><br/>这里不会显示其它接口的模型。<br/>请在下方添加本接口要用的模型 ID，再点「保存接口」。</div>');
+          return;
+        }
+
+        // ===== 编辑/管理：只显示绑定接口自己的模型 =====
+        var owner = boundProfile();
+        if (!owner) {
+          el.modelOwnerBar.textContent = "请选择接口，或点「新建接口」。";
+          el.modelList.innerHTML = '<div class="empty">每个接口有独立模型列表。</div>';
+          el.addModelTarget.textContent = "请先选择接口。";
+          el.btnClearModels.disabled = true;
+          el.btnAddModel.disabled = true;
+          return;
+        }
+        normalizeProfileModels(owner);
+        el.modelOwnerBar.textContent = "接口「" + owner.name + "」的模型（仅此接口）";
+        el.addModelTarget.textContent = "将添加到接口：" + owner.name + " · " + owner.baseUrl;
+        el.btnClearModels.disabled = false;
+        el.btnAddModel.disabled = false;
+        renderModelListFrom(owner.models || [],
+          '<div class="empty">「' + escapeHtml(owner.name) + '」模型为空。请手动添加该站模型 ID（不会自动获取）。</div>');
+      }
+
+      var editingModelId = null;
+
+      function pricesToText(m) {
+        var prices = (m && m.prices) || {};
+        var sizes = (m && m.sizes) || Object.keys(prices);
+        return sizes.map(function (s) { return s + "=" + (prices[s] != null ? prices[s] : 0); }).join(",");
+      }
+
+      function resetModelForm() {
+        editingModelId = null;
+        if (el.newModelId) el.newModelId.value = "";
+        if (el.newModelName) el.newModelName.value = "";
+        if (el.newModelType) el.newModelType.value = "i2v";
+        if (el.newModelPrices) el.newModelPrices.value = "720P=0.5";
+        if (el.newModelMinSec) el.newModelMinSec.value = "3";
+        if (el.newModelMaxSec) el.newModelMaxSec.value = "15";
+        if (el.btnAddModel) el.btnAddModel.textContent = "添加到所选接口";
+        if (el.btnCancelEditModel) el.btnCancelEditModel.classList.add("hidden");
+        if (el.modelFormHelp) {
+          el.modelFormHelp.textContent = "点模型列表中的「编辑」可回填并修改；保存后立即生效。";
+        }
+      }
+
+      function fillModelForm(m) {
+        if (!m) return;
+        editingModelId = m.id;
+        if (el.newModelId) el.newModelId.value = m.id || "";
+        if (el.newModelName) el.newModelName.value = m.name || m.id || "";
+        if (el.newModelType) el.newModelType.value = m.type === "t2v" ? "t2v" : "i2v";
+        if (el.newModelPrices) el.newModelPrices.value = pricesToText(m);
+        if (el.newModelMinSec) el.newModelMinSec.value = String(m.minSec || 3);
+        if (el.newModelMaxSec) el.newModelMaxSec.value = String(m.maxSec || 15);
+        if (el.btnAddModel) el.btnAddModel.textContent = "保存模型修改";
+        if (el.btnCancelEditModel) el.btnCancelEditModel.classList.remove("hidden");
+        if (el.modelFormHelp) {
+          el.modelFormHelp.textContent = "正在编辑模型「" + (m.id || "") + "」，点「保存模型修改」写入，或「取消编辑模型」。";
+        }
+        markSettingsDirty();
+        if (el.newModelId && el.newModelId.focus) el.newModelId.focus();
+      }
+
+      function buildModelDraft() {
+        var id = el.newModelId.value.trim();
+        var name = el.newModelName.value.trim() || id;
+        var type = el.newModelType.value === "t2v" ? "t2v" : "i2v";
+        var minSec = parseInt(el.newModelMinSec.value, 10) || 3;
+        var maxSec = parseInt(el.newModelMaxSec.value, 10) || 15;
+        if (minSec > maxSec) { var t = minSec; minSec = maxSec; maxSec = t; }
+
+        // 格式：720P=0.5,1080P=1 ；兼容：纯数字逗号列表 + 旧清晰度框
+        var raw = el.newModelPrices.value.trim() || "720P=0.5";
+        var prices = {};
+        var sizes = [];
+        var hasPair = /[=:：]/.test(raw);
+
+        if (hasPair) {
+          raw.split(/[,，]+/).forEach(function (part) {
+            part = part.trim();
+            if (!part) return;
+            var m = part.match(/^([^=:：]+)[=:：]\s*([0-9.]+)$/);
+            if (!m) return;
+            var sz = m[1].trim().toUpperCase();
+            var val = parseFloat(m[2]);
+            if (!sz || isNaN(val)) return;
+            sizes.push(sz);
+            prices[sz] = val;
+          });
+        } else {
+          // 旧：清晰度列表 + 价格列表一一对应（若仍有 newModelSizes）
+          var sizeInput = el.newModelSizes && el.newModelSizes.value
+            ? el.newModelSizes.value.trim() : "";
+          var sizeList = sizeInput
+            ? sizeInput.split(/[,，\s]+/).filter(Boolean).map(function (s) { return s.toUpperCase(); })
+            : [];
+          var priceVals = raw.split(/[,，\s]+/).filter(Boolean).map(parseFloat);
+          if (!sizeList.length) {
+            sizeList = ["720P"];
+          }
+          sizeList.forEach(function (sz, i) {
+            var val = priceVals[i] != null && !isNaN(priceVals[i]) ? priceVals[i] : priceVals[0];
+            if (val == null || isNaN(val)) val = 0.5;
+            sizes.push(sz);
+            prices[sz] = val;
+          });
+        }
+
+        if (!id) { toast("请填写模型 ID（与接口 model 字段一致）", "err"); return null; }
+        if (!name) name = id;
+        if (!sizes.length) {
+          toast("请按 720P=0.5,1080P=1 格式填写清晰度与单价", "err");
+          return null;
+        }
+
+        return {
+          id: id, name: name || id, type: type, builtin: false,
+          sizes: sizes, defaultSize: sizes[0], prices: prices,
+          minSec: minSec, maxSec: maxSec,
+          defaultSec: Math.min(Math.max(5, minSec), maxSec),
+          help: (type === "t2v" ? "文生" : "图生") + " · " + sizes.map(function (s) {
+            return s + " " + money(prices[s]) + "/s";
+          }).join(" · ")
+        };
+      }
+
+      function addModelToOwner() {
+        var draft = buildModelDraft();
+        if (!draft) return;
+
+        // ===== 编辑已有模型：原 ID 上更新 =====
+        if (editingModelId) {
+          var list = isCreateForm() ? (state.pendingModels || []) : (boundProfile() ? boundProfile().models : null);
+          if (!list) { toast("请先选择接口", "err"); return; }
+          var idx = -1;
+          for (var i = 0; i < list.length; i++) {
+            if (list[i] && list[i].id === editingModelId) { idx = i; break; }
+          }
+          if (idx < 0) { toast("要编辑的模型不存在，请重新点「编辑」", "err"); resetModelForm(); return; }
+          // 允许改 ID：若新 ID 与其它模型冲突则拦
+          if (draft.id !== editingModelId && list.some(function (m) { return m && m.id === draft.id; })) {
+            toast("模型 ID 与其它模型重复：" + draft.id, "err");
+            return;
+          }
+          var oldId = editingModelId;
+          list[idx] = draft;
+          var owner = isCreateForm() ? null : boundProfile();
+          if (owner && owner.selectedModelId === oldId) owner.selectedModelId = draft.id;
+          if (!isCreateForm()) {
+            persist();
+            renderModelManagement();
+            renderProfiles();
+            renderProfileSelect();
+            if (owner && owner.id === state.activeProfileId) renderModelOptions();
+          } else {
+            renderModelManagement();
+          }
+          resetModelForm();
+          clearSettingsDirty();
+          toast("模型已更新：" + draft.id, "ok");
+          return;
+        }
+
+        if (isCreateForm()) {
+          if (!Array.isArray(state.pendingModels)) state.pendingModels = [];
+          if (state.pendingModels.some(function (m) { return m.id === draft.id; })) {
+            toast("新建暂存里已有该模型 ID", "err");
+            return;
+          }
+          state.pendingModels.push(draft);
+          renderModelManagement();
+          resetModelForm();
+          markSettingsDirty();
+          toast("已加入新建暂存：" + draft.name + "（保存接口时写入）", "ok");
+          return;
+        }
+
+        var p = boundProfile();
+        if (!p) { toast("请先选择接口", "err"); return; }
+        normalizeProfileModels(p);
+        if (p.models.some(function (m) { return m.id === draft.id; })) {
+          toast("接口「" + p.name + "」下已有模型 ID：" + draft.id + "，可点「编辑」修改", "err");
+          return;
+        }
+        p.models.push(draft);
+        if (!p.selectedModelId) p.selectedModelId = draft.id;
+        persist();
+        renderModelManagement();
+        renderProfiles();
+        renderProfileSelect();
+        if (p.id === state.activeProfileId) renderModelOptions();
+        resetModelForm();
+        clearSettingsDirty();
+        toast("已添加到「" + p.name + "」：" + draft.name, "ok");
+      }
+
+      function clearModelsOfOwner() {
+        if (isCreateForm()) {
+          if (!(state.pendingModels || []).length) { toast("新建暂存已是空的"); return; }
+          askConfirm("清空暂存", "清空新建时添加的 " + (state.pendingModels || []).length + " 个模型？其它接口不受影响。", "继续")
+            .then(function (ok) {
+              if (!ok) return false;
+              return askConfirm("再次确认", "再次确认：清空新建暂存模型？不可撤销。", "确认清空");
+            })
+            .then(function (ok) {
+              if (!ok) return;
+              state.pendingModels = [];
+              resetModelForm();
+              renderModelManagement();
+              markSettingsDirty();
+              toast("新建暂存已清空", "ok");
+            });
+          return;
+        }
+        var p = boundProfile();
+        if (!p) return;
+        var n = (p.models || []).length;
+        if (!n) { toast("该接口模型已是空的"); return; }
+        askConfirm("清空模型", "清空接口「" + p.name + "」的 " + n + " 个模型？其它接口不受影响。", "继续")
+          .then(function (ok) {
+            if (!ok) return false;
+            return askConfirm("再次确认", "再次确认：清空「" + p.name + "」的全部模型？此操作会立即保存，不可撤销。", "确认清空");
+          })
+          .then(function (ok) {
+            if (!ok) return;
+            p.models = [];
+            p.selectedModelId = null;
+            resetModelForm();
+            persist();
+            renderModelManagement();
+            renderProfiles();
+            renderProfileSelect();
+            if (p.id === state.activeProfileId) renderModelOptions();
+            toast("已清空「" + p.name + "」的模型", "ok");
+          });
+      }
+
+      function deleteModelFromOwner(modelId) {
+        if (isCreateForm()) {
+          var pending = state.pendingModels || [];
+          var hit = pending.find(function (m) { return m.id === modelId; });
+          state.pendingModels = pending.filter(function (m) { return m.id !== modelId; });
+          renderModelManagement();
+          toast("已从新建暂存移除：" + (hit ? hit.name : modelId), "ok");
+          return;
+        }
+        var p = boundProfile();
+        if (!p) return;
+        var name = modelId;
+        p.models.forEach(function (m) { if (m.id === modelId) name = m.name || modelId; });
+        askConfirm("删除模型", "从接口「" + p.name + "」删除「" + name + "」？", "确认删除").then(function (ok) {
+          if (!ok) return;
+          p.models = p.models.filter(function (m) { return m.id !== modelId; });
+          if (p.selectedModelId === modelId) {
+            p.selectedModelId = p.models[0] ? p.models[0].id : null;
+          }
+          persist();
+          renderModelManagement();
+          renderProfiles();
+          renderProfileSelect();
+          if (p.id === state.activeProfileId) renderModelOptions();
+          toast("已从「" + p.name + "」删除：" + name, "ok");
+        });
+      }
+
+      function applyMockMode(on, quiet) {
+        state.mock = !!on;
+        if (el.mockMode) el.mockMode.checked = !!state.mock;
+        if (el.btnFillDemo) el.btnFillDemo.disabled = !state.mock;
+        persist();
+        refreshGenerateChrome();
+        if (!quiet) toast(state.mock ? "已开启演示模式（不扣费）" : "已关闭演示模式：生成将走真实接口并扣费", state.mock ? "ok" : null);
+      }
+
+      function savePrefs() {
+        applyMockMode(el.mockMode ? el.mockMode.checked : state.mock);
+      }
+
+      // 页面卸载时再写一次本机备份，减少丢配置
+      window.addEventListener("beforeunload", function () {
+        try { persist(); } catch (e) {}
+      });
+      window.addEventListener("pagehide", function () {
+        try { persist(); } catch (e) {}
+      });
+
+      function exportBackup() {
+        try {
+          var payload = {
+            app: "ai-video-workbench",
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            aiv_cfg: loadJson("aiv_cfg", null),
+            aiv_tasks: loadJson("aiv_tasks", [])
+          };
+          var stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+          var filename = "ai-video-backup-" + stamp + ".json";
+
+          function finish(path, mode) {
+            if (el.backupStatus) {
+              el.backupStatus.textContent = mode === "desktop"
+                ? ("备份已保存到：" + path)
+                : ("已通过浏览器下载：" + filename + "（请查看浏览器默认下载目录）");
+            }
+            toast(mode === "desktop" ? ("备份已导出：" + path) : ("已导出：" + filename), "ok");
+          }
+
+          if (hasDesktopApi() && typeof window.pywebview.api.export_backup === "function") {
+            Promise.resolve(window.pywebview.api.export_backup(payload, filename))
+              .then(function (res) {
+                if (res && res.ok && res.path) finish(res.path, "desktop");
+                else {
+                  if (el.backupStatus) el.backupStatus.textContent = "导出失败：" + ((res && res.error) || "未知错误");
+                  toast("导出失败", "err");
+                }
+              })
+              .catch(function (e) {
+                if (el.backupStatus) el.backupStatus.textContent = String(e && e.message ? e.message : e);
+                toast("导出失败", "err");
+              });
+            return;
+          }
+
+          var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+          var a = document.createElement("a");
+          var href = URL.createObjectURL(blob);
+          a.href = href;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(function () { URL.revokeObjectURL(href); }, 8000);
+          finish(filename, "browser");
+        } catch (e) {
+          toast("导出失败：" + String(e && e.message ? e.message : e), "err");
+        }
+      }
+
+      function importBackupFile(file) {
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          try {
+            var data = JSON.parse(String(reader.result || ""));
+            if (!data || data.app !== "ai-video-workbench") {
+              toast("不是本应用的备份文件", "err");
+              return;
+            }
+            if (data.aiv_cfg) saveJson("aiv_cfg", data.aiv_cfg);
+            if (Array.isArray(data.aiv_tasks)) saveJson("aiv_tasks", data.aiv_tasks);
+            state = migrateState();
+            fillProfileForm(null);
+            if (el.mockMode) el.mockMode.checked = !!state.mock;
+            refreshGenerateChrome();
+            renderAllSettings();
+            renderTasks();
+            persist();
+            var nTasks = (state.tasks || []).length;
+            var nProf = (state.profiles || []).length;
+            if (el.backupStatus) {
+              el.backupStatus.textContent = "导入成功：接口 " + nProf + " 个，任务 " + nTasks + " 条。";
+            }
+            toast("备份已导入", "ok");
+          } catch (e) {
+            toast("导入失败：文件无法解析", "err");
+          }
+        };
+        reader.readAsText(file);
+      }
+
+
+      var settingsDirty = false;
+      var settingsHistoryPushed = false;
+
+      function setEditorVisible(on) {
+        var home = document.getElementById("settingsHome");
+        var ed = document.getElementById("settingsEditor");
+        if (home) home.classList.toggle("hidden", !!on);
+        if (ed) ed.classList.toggle("hidden", !on);
+      }
+
+      function markSettingsDirty() { settingsDirty = true; }
+
+      function clearSettingsDirty() { settingsDirty = false; }
+
+      function openSettingsEditor(profile) {
+        // 添加/编辑都进入独立配置页，改好后保存或退出
+        setEditorVisible(true);
+        clearSettingsDirty();
+        fillProfileForm(profile || null);
+        if (!settingsHistoryPushed) {
+          try {
+            history.pushState({ aivSettingsEdit: 1 }, "");
+            settingsHistoryPushed = true;
+          } catch (e) {}
+        }
+      }
+
+      function doLeaveSettingsEditor(saveFirst) {
+        if (saveFirst) {
+          try {
+            if (saveProfile() === false) return;
+          } catch (e) {
+            toast("保存失败，未退出", "err");
+            return;
+          }
+        }
+        settingsDirty = false;
+        settingsHistoryPushed = false;
+        try { history.replaceState({}, ""); } catch (e) {}
+        setEditorVisible(false);
+        renderAllSettings();
+        refreshGenerateChrome();
+      }
+
+      function leaveSettingsEditor() {
+        if (!settingsDirty) {
+          doLeaveSettingsEditor(false);
+          return;
+        }
+        askConfirm3(
+          "当前未保存",
+          "离开配置页前请选择：保存并退出，或取消保存并退出（放弃修改）。",
+          "保存并退出",
+          "取消保存并退出"
+        ).then(function (choice) {
+          if (choice === "save") doLeaveSettingsEditor(true);
+          else if (choice === "discard") doLeaveSettingsEditor(false);
+          // stay → 留在编辑页
+        });
+      }
+
+      window.__appHandleBack = function () {
+        var ed = document.getElementById("settingsEditor");
+        if (ed && !ed.classList.contains("hidden")) {
+          leaveSettingsEditor();
+          return true;
+        }
+        return false;
+      };
+
+      window.addEventListener("popstate", function () {
+        if (window.__appHandleBack()) {
+          try { history.pushState({ aivSettingsEdit: 1 }, ""); settingsHistoryPushed = true; } catch (e) {}
+        }
+      });
+
+      function applyFontSize(scale) {
+        var pct = Math.round(Number(scale) * 100) || 100;
+        if (pct < 85) pct = 85;
+        if (pct > 130) pct = 130;
+        var v = String(pct / 100);
+        document.documentElement.style.setProperty("--ui-scale", v);
+        try { localStorage.setItem("aiv_font_scale", v); } catch (e) {}
+        var range = document.getElementById("fontSizeRange");
+        var val = document.getElementById("fontSizeVal");
+        if (range) range.value = String(pct);
+        if (val) val.textContent = pct + "%";
+      }
+
+      function renderDownloadDir() {
+        var v = getDownloadDir();
+        if (el.downloadDir) el.downloadDir.value = v || "";
+        if (el.downloadDirDisplay) {
+          el.downloadDirDisplay.textContent = v ? v : "应用目录（默认）";
+        }
+      }
+
+      function renderAllSettings() {
+        renderProfiles();
+        try { renderDownloadDir(); } catch (e) {}
+        if (el.settingsEditor && !el.settingsEditor.classList.contains("hidden")) {
+          renderModelManagement();
+        }
+        renderProfileSelect();
+      }
+
+      function refreshGenerateChrome() {
+        renderProfileSelect();
+        renderModelOptions();
+        updateModePill();
+        updateCost();
+      }
+
+      function setTab(name) {
+        try {
+          state.tab = name || "generate";
+          var radio = document.getElementById("nt-" + state.tab);
+          if (radio) radio.checked = true;
+          if (typeof window.__appOnTab === "function") window.__appOnTab(state.tab);
+        } catch (e) { console.warn("setTab", e); }
+      }
+
+      window.__appOnTab = function (name) {
+        state.tab = name;
+        if (name === "settings") {
+          try { renderAllSettings(); } catch (e) { console.warn(e); }
+          if (el && el.mockMode) el.mockMode.checked = !!state.mock;
+          try { ensureDesktopDownloadDir(); } catch (e) {}
+        }
+        if (name === "tasks") {
+          try { renderTasks(); } catch (e) { console.warn(e); }
+        }
+        if (name === "generate") {
+          try { refreshGenerateChrome(); } catch (e) { console.warn(e); }
+        }
+      };
+
+      function getByPath(obj, path) {
+        if (!obj || !path) return undefined;
+        var parts = path.split(".");
+        var cur = obj;
+        for (var i = 0; i < parts.length; i++) {
+          if (cur == null) return undefined;
+          cur = cur[parts[i]];
+        }
+        return cur;
+      }
+      function pickFirst(obj, candidates) {
+        for (var i = 0; i < candidates.length; i++) {
+          var v = getByPath(obj, candidates[i]);
+          if (v !== undefined && v !== null && v !== "") return v;
+        }
+        return undefined;
+      }
+      function normalizeStatus(raw) {
+        if (raw == null) return "running";
+        var s = String(raw);
+        var lower = s.toLowerCase();
+        if (POLL.success_values.indexOf(s) >= 0 || POLL.success_values.indexOf(lower) >= 0) return "success";
+        if (POLL.failure_values.indexOf(s) >= 0 || POLL.failure_values.indexOf(lower) >= 0) return "failed";
+        if (["ok", "done", "finished"].indexOf(lower) >= 0) return "success";
+        if (["fail", "cancelled", "canceled", "rejected"].indexOf(lower) >= 0) return "failed";
+        if (["queued", "pending", "waiting", "created", "submitted", "running", "processing"].indexOf(lower) >= 0) return "running";
+        return "running";
+      }
+
+      function persistTasks() {
+        saveJson("aiv_tasks", state.tasks);
+        try {
+          if (hasDesktopApi() && typeof window.pywebview.api.save_app_state === "function") {
+            window.pywebview.api.save_app_state({
+              aiv_cfg: {
+                profiles: state.profiles,
+                activeProfileId: state.activeProfileId,
+                mock: state.mock
+              },
+              aiv_tasks: state.tasks,
+              aiv_download_dir: getDownloadDir()
+            });
+          }
+        } catch (e) {}
+      }
+      function addTask(task) { state.tasks.unshift(task); persistTasks(); renderTasks(); }
+      function updateTask(id, patch) {
+        for (var i = 0; i < state.tasks.length; i++) {
+          if (state.tasks[i].id === id) { state.tasks[i] = Object.assign({}, state.tasks[i], patch); break; }
+        }
+        persistTasks(); renderTasks();
+      }
+
+      function validateGenerate() {
+        var p = activeProfile();
+        var model = activeModel();
+        if (!p) { toast("请先在设置里创建接口", "err"); return null; }
+        if (!model) {
+          toast("接口「" + p.name + "」还没有模型，请先添加", "err");
+          return null;
+        }
+        var prompt = el.prompt.value.trim();
+        var needImage = model.type !== "t2v";
+        var imgRef = currentImageRef();
+
+        if (needImage) {
+          if (!imgRef) {
+            toast("图生模型必须提供参考图：本地上传或填写图片链接", "err");
+            if (state.imageMode === "url" && el.imageUrl) el.imageUrl.focus();
+            else if (el.imageFile) el.imageFile.focus();
+            return null;
+          }
+          if (state.imageMode === "url" && !/^https?:\/\//i.test(imgRef)) {
+            toast("图片链接需以 http(s):// 开头", "err");
+            el.imageUrl.focus();
+            return null;
+          }
+        } else {
+          imgRef = null; // 文生不传图
+        }
+        if (!prompt) { toast("请填写提示词", "err"); el.prompt.focus(); return null; }
+        return {
+          profileId: p.id,
+          profileName: p.name,
+          imageUrl: imgRef,
+          prompt: prompt,
+          size: state.size,
+          seconds: state.seconds,
+          model: model.id,
+          type: model.type
+        };
+      }
+
+      function buildRequestBody(input) {
+        var body = {
+          model: input.model,
+          prompt: input.prompt,
+          duration: Number(input.seconds) || 5
+        };
+        if (input.size) body.size = input.size;
+        if (input.type !== "t2v" && input.imageUrl) {
+          body.input_reference = input.imageUrl; // URL 或 data:image/...;base64,...
+        }
+        return body;
+      }
+
+      async function startGenerate() {
+        var input = validateGenerate();
+        if (!input) return;
+        var mock = isMock();
+        if (!mock) {
+          if (!currentApiKey()) {
+            toast("真实生成需要 API Key；或开启演示模式", "err");
+            return;
+          }
+          var model = activeModel();
+          var price = model ? unitPrice(model, state.size) : 0;
+          var cost = money(price * (Number(input.seconds) || 5));
+          var ok1 = await askConfirm(
+            "将产生费用",
+            "真实接口生成会扣费，预估约 " + cost + "。是否继续？",
+            "继续"
+          );
+          if (!ok1) return;
+          var ok2 = await askConfirm(
+            "再次确认",
+            "确认使用「" + input.profileName + " / " + input.model + "」真实生成并扣费？",
+            "确认扣费生成"
+          );
+          if (!ok2) return;
+        }
+        var task = {
+          id: uid("task"),
+          remoteId: null,
+          model: input.model,
+          type: input.type,
+          prompt: input.prompt,
+          imageUrl: input.imageUrl,
+          size: input.size,
+          seconds: input.seconds,
+          status: mock ? "mock" : "queued",
+          statusRaw: mock ? "MOCK" : "queued",
+          videoUrl: null,
+          error: null,
+          mock: mock,
+          profileName: input.profileName,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        };
+        addTask(task);
+        setTab("tasks");
+        toast(mock ? "演示任务已创建" : "已提交：" + input.profileName + " / " + input.model, "ok");
+        if (mock) runMockTask(task); else submitRealTask(task);
+      }
+
+      function runMockTask(task) {
+        [
+          { ms: 800, status: "running", statusRaw: "RUNNING" },
+          { ms: 1800, status: "running", statusRaw: "PROCESSING" },
+          { ms: 3200, status: "success", statusRaw: "SUCCESS", videoUrl: "https://www.w3schools.com/html/mov_bbb.mp4" }
+        ].forEach(function (step) {
+          setTimeout(function () {
+            updateTask(task.id, {
+              status: step.status, statusRaw: step.statusRaw,
+              videoUrl: step.videoUrl || null, updatedAt: Date.now()
+            });
+            if (step.status === "success") toast("演示任务完成", "ok");
+          }, step.ms);
+        });
+      }
+
+      function submitRealTask(task) {
+        var url = currentBaseUrl() + ENDPOINT;
+        fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + currentApiKey()
+          },
+          body: JSON.stringify(buildRequestBody(task))
+        })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              var json = null;
+              try { json = text ? JSON.parse(text) : null; } catch (e) {}
+              return { status: res.status, ok: res.ok, text: text, json: json };
+            });
+          })
+          .then(function (result) {
+            if (!result.ok) {
+              var errMsg = (result.json && (result.json.message || result.json.error || result.json.msg)) || result.text || ("HTTP " + result.status);
+              updateTask(task.id, { status: "failed", statusRaw: "FAILED", error: String(errMsg).slice(0, 500), updatedAt: Date.now() });
+              toast("提交失败：" + String(errMsg).slice(0, 80), "err");
+              return;
+            }
+            var remoteId = pickFirst(result.json, POLL.id_candidates);
+            var earlyUrl = pickFirst(result.json, POLL.url_candidates);
+            var earlyStatus = pickFirst(result.json, POLL.status_candidates);
+            var earlyFail = pickFirst(result.json, POLL.fail_candidates);
+            var norm = normalizeStatus(earlyStatus);
+            if (norm === "failed") {
+              updateTask(task.id, {
+                remoteId: remoteId || null,
+                status: "failed",
+                statusRaw: String(earlyStatus || "FAILURE"),
+                error: String(earlyFail || result.text || "FAILURE").slice(0, 400),
+                updatedAt: Date.now()
+              });
+              toast("任务失败：" + String(earlyFail || earlyStatus || "FAILURE").slice(0, 60), "err");
+              return;
+            }
+            if (earlyUrl && (norm === "success" || earlyStatus == null)) {
+              updateTask(task.id, { remoteId: remoteId || null, status: "success", statusRaw: String(earlyStatus || "SUCCESS"), videoUrl: String(earlyUrl), updatedAt: Date.now() });
+              toast("生成完成 · 请尽快下载（约 24 小时后可能删除）", "ok");
+              return;
+            }
+            updateTask(task.id, {
+              remoteId: remoteId || null,
+              status: norm === "failed" ? "failed" : norm,
+              statusRaw: earlyStatus != null ? String(earlyStatus) : "submitted",
+              videoUrl: earlyUrl ? String(earlyUrl) : null,
+              error: norm === "failed" ? (result.text || "failed") : null,
+              updatedAt: Date.now()
+            });
+            if (remoteId) pollRealTask(task.id, remoteId);
+            else if (!earlyUrl) {
+              updateTask(task.id, { status: "failed", error: "接口未返回 task_id 或视频地址：" + String(result.text || "").slice(0, 300), updatedAt: Date.now() });
+              toast("提交响应缺少任务 ID", "err");
+            }
+          })
+          .catch(function (err) {
+            updateTask(task.id, { status: "failed", statusRaw: "ERROR", error: String(err && err.message ? err.message : err), updatedAt: Date.now() });
+            toast("网络错误：" + String(err && err.message ? err.message : err), "err");
+          });
+      }
+
+      function pollRealTask(localId, remoteId) {
+        if (state.pollTimers[localId]) return;
+        var attempts = 0;
+        var maxAttempts = 60;
+        function tick() {
+          attempts += 1;
+          fetch(currentBaseUrl() + ENDPOINT + "/" + encodeURIComponent(remoteId), {
+            method: "GET",
+            headers: { "Authorization": "Bearer " + currentApiKey() }
+          })
+            .then(function (res) {
+              return res.text().then(function (text) {
+                var json = null;
+                try { json = text ? JSON.parse(text) : null; } catch (e) {}
+                return { status: res.status, ok: res.ok, text: text, json: json };
+              });
+            })
+            .then(function (result) {
+              if (!result.ok) {
+                if (attempts >= maxAttempts) {
+                  delete state.pollTimers[localId];
+                  updateTask(localId, { status: "failed", error: "轮询失败：" + String(result.text || result.status).slice(0, 300), updatedAt: Date.now() });
+                  return;
+                }
+                state.pollTimers[localId] = setTimeout(tick, 3000);
+                return;
+              }
+              var statusRaw = pickFirst(result.json, POLL.status_candidates);
+              var videoUrl = pickFirst(result.json, POLL.url_candidates);
+              var failReason = pickFirst(result.json, POLL.fail_candidates);
+              var norm = normalizeStatus(statusRaw);
+              if (norm === "success" && videoUrl) {
+                delete state.pollTimers[localId];
+                updateTask(localId, { status: "success", statusRaw: String(statusRaw || "SUCCESS"), videoUrl: String(videoUrl), updatedAt: Date.now() });
+                toast("生成完成 · 请尽快下载（约 24 小时后可能删除）", "ok");
+                return;
+              }
+              if (norm === "success" && !videoUrl) {
+                delete state.pollTimers[localId];
+                updateTask(localId, {
+                  status: "failed",
+                  statusRaw: String(statusRaw || "SUCCESS"),
+                  error: "状态 SUCCESS 但无 result_url：" + String(result.text || "").slice(0, 200),
+                  updatedAt: Date.now()
+                });
+                return;
+              }
+              if (norm === "failed") {
+                delete state.pollTimers[localId];
+                updateTask(localId, {
+                  status: "failed",
+                  statusRaw: String(statusRaw || "FAILURE"),
+                  error: String(failReason || result.text || "FAILURE").slice(0, 400),
+                  updatedAt: Date.now()
+                });
+                toast("任务失败：" + String(failReason || statusRaw || "FAILURE").slice(0, 60), "err");
+                return;
+              }
+              updateTask(localId, {
+                status: norm === "queued" ? "queued" : "running",
+                statusRaw: statusRaw != null ? String(statusRaw) : "running",
+                videoUrl: videoUrl ? String(videoUrl) : null,
+                updatedAt: Date.now()
+              });
+              if (attempts >= maxAttempts) {
+                delete state.pollTimers[localId];
+                updateTask(localId, { status: "failed", error: "轮询超时：" + remoteId, updatedAt: Date.now() });
+                toast("轮询超时", "err");
+                return;
+              }
+              state.pollTimers[localId] = setTimeout(tick, 3000);
+            })
+            .catch(function () {
+              if (attempts >= maxAttempts) {
+                delete state.pollTimers[localId];
+                updateTask(localId, { status: "failed", error: "网络轮询失败", updatedAt: Date.now() });
+                return;
+              }
+              state.pollTimers[localId] = setTimeout(tick, 4000);
+            });
+        }
+        state.pollTimers[localId] = setTimeout(tick, 2000);
+      }
+
+      function statusLabel(t) {
+        if (t.mock && t.status === "success") return { cls: "mock", text: "演示完成" };
+        if (t.mock && t.status !== "failed") return { cls: "mock", text: "演示中" };
+        if (t.status === "success") return { cls: "success", text: "成功" };
+        if (t.status === "failed") return { cls: "failed", text: "失败" };
+        if (t.status === "queued") return { cls: "queued", text: "排队" };
+        return { cls: "running", text: "生成中" };
+      }
+      function fmtTime(ts) {
+        var d = new Date(ts);
+        function p(n) { return n < 10 ? "0" + n : String(n); }
+        return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+      }
+      function findTask(id) {
+        for (var i = 0; i < state.tasks.length; i++) if (state.tasks[i].id === id) return state.tasks[i];
+        return null;
+      }
+      function videoAgeNote(ts) {
+        var hours = (Date.now() - (ts || Date.now())) / 3600000;
+        if (hours >= 20) return { level: "warn", text: "生成已超过约20小时，约 24 小时后可能删除，请立即下载" };
+        if (hours >= 12) return { level: "hint", text: "请尽快下载（约 24 小时后可能删除）" };
+        return { level: "ok", text: "请下载保存到本地，勿只依赖任务里的在线链接；约 24 小时后可能删除" };
+      }
+
+      function defaultVideoName(task) {
+        var id = (task && (task.remoteId || task.id)) || "video";
+        return "ai-video-" + String(id).replace(/[^\w\-]+/g, "").slice(0, 24) + ".mp4";
+      }
+
+      function getDownloadDir() {
+        try { return String(localStorage.getItem("aiv_download_dir") || "").trim(); }
+        catch (e) { return ""; }
+      }
+
+      function setDownloadDir(dir) {
+        try { localStorage.setItem("aiv_download_dir", String(dir || "").trim()); } catch (e) {}
+        renderDownloadDir();
+      }
+
+      function hasDesktopApi() {
+        return !!(window.pywebview && window.pywebview.api && typeof window.pywebview.api.save_video === "function");
+      }
+
+      /** 安卓原生目录插件（Capacitor） */
+      function aivDirPlugin() {
+        try {
+          if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AIVDir) {
+            return window.Capacitor.Plugins.AIVDir;
+          }
+        } catch (e) {}
+        return null;
+      }
+
+      function hasNativeDir() {
+        var p = aivDirPlugin();
+        return !!(p && typeof p.pickDirectory === "function");
+      }
+
+      async function ensureDesktopDownloadDir() {
+        if (hasDesktopApi()) {
+          try {
+            if (window.pywebview.api.get_download_dir) {
+              var fromHost = await window.pywebview.api.get_download_dir();
+              if (fromHost) {
+                setDownloadDir(fromHost);
+                return fromHost;
+              }
+            }
+          } catch (e) {}
+          return getDownloadDir();
+        }
+        // 安卓：以原生插件记住的目录为准
+        if (hasNativeDir()) {
+          try {
+            var st = await aivDirPlugin().getStatus();
+            if (st && st.ok) {
+              setDownloadDir(st.hasDir ? (st.path || "") : "");
+              return getDownloadDir();
+            }
+          } catch (e) {}
+        }
+        return getDownloadDir();
+      }
+
+      async function pickDownloadDir() {
+        // 桌面：系统选目录
+        if (hasDesktopApi() && typeof window.pywebview.api.choose_folder === "function") {
+          try {
+            var res = await window.pywebview.api.choose_folder();
+            if (res && res.ok && res.folder) {
+              setDownloadDir(res.folder);
+              if (el.downloadDirStatus) el.downloadDirStatus.textContent = "已选择并记住：" + res.folder;
+              toast("下载文件夹已设置", "ok");
+            } else if (res && res.cancelled) {
+              if (el.downloadDirStatus) el.downloadDirStatus.textContent = "未更改目录。";
+            } else {
+              toast((res && res.error) || "选择文件夹失败", "err");
+            }
+            return;
+          } catch (e) {
+            toast("选择文件夹失败：" + String(e && e.message ? e.message : e), "err");
+            return;
+          }
+        }
+        // 安卓 APK：系统目录选择器（SAF）
+        if (hasNativeDir()) {
+          try {
+            var r = await aivDirPlugin().pickDirectory();
+            if (r && r.ok && r.path) {
+              setDownloadDir(r.path);
+              if (el.downloadDirStatus) el.downloadDirStatus.textContent = "已选择并记住：" + r.path;
+              toast("下载目录已设置：" + r.path, "ok");
+            } else if (r && r.cancelled) {
+              if (el.downloadDirStatus) el.downloadDirStatus.textContent = "未更改目录。";
+            } else {
+              toast((r && r.error) || "选择文件夹失败", "err");
+            }
+          } catch (e) {
+            toast("选择文件夹失败：" + String(e && e.message ? e.message : e), "err");
+          }
+          return;
+        }
+        // 纯浏览器预览
+        if (window.showDirectoryPicker) {
+          try {
+            var handle = await window.showDirectoryPicker({ mode: "readwrite" });
+            setDownloadDir(handle.name || "所选目录");
+            if (el.downloadDirStatus) el.downloadDirStatus.textContent = "已选择：" + (handle.name || "所选目录");
+            toast("目录已设置", "ok");
+            return;
+          } catch (e) {
+            if (e && e.name === "AbortError") return;
+          }
+        }
+        var useDefault = await askConfirm(
+          "选择目录",
+          "当前环境无法打开系统选目录。使用默认「应用目录」？",
+          "使用应用目录"
+        );
+        if (useDefault) {
+          setDownloadDir("");
+          if (el.downloadDirStatus) el.downloadDirStatus.textContent = "已使用默认：应用目录";
+          toast("已恢复应用目录", "ok");
+        }
+      }
+
+      function resetDownloadDir() {
+        setDownloadDir("");
+        if (hasNativeDir()) {
+          try { aivDirPlugin().resetDirectory(); } catch (e) {}
+        }
+        if (el.downloadDirStatus) el.downloadDirStatus.textContent = "已恢复默认：应用目录";
+        toast("已恢复应用目录", "ok");
+      }
+
+      async function downloadVideoFile(url, filename) {
+        if (!url) return;
+        // 桌面
+        if (hasDesktopApi() && typeof window.pywebview.api.save_video === "function") {
+          var folder = await ensureDesktopDownloadDir();
+          if (!folder) {
+            await pickDownloadDir();
+            folder = getDownloadDir();
+          }
+          var target = folder || "";
+          toast(target ? ("自动下载到设置目录：" + target) : "未设置目录，将保存到应用 data\\backups", null);
+          try {
+            var res = await window.pywebview.api.save_video(url, filename || "video.mp4", target);
+            if (res && res.ok) {
+              if (el.downloadDirStatus) el.downloadDirStatus.textContent = "已保存到：" + res.path;
+              toast("已下载：" + res.path, "ok");
+              return;
+            }
+            toast((res && res.error) || "下载失败", "err");
+          } catch (e) {
+            toast("下载失败：" + String(e && e.message ? e.message : e), "err");
+          }
+          return;
+        }
+        // 安卓 APK：写入所选目录 / 应用目录
+        if (hasNativeDir()) {
+          var dirLabel = getDownloadDir() || "应用目录（默认）";
+          toast("正在保存到：" + dirLabel, null);
+          try {
+            var r = await aivDirPlugin().saveUrl({
+              url: url,
+              filename: filename || "video.mp4"
+            });
+            if (r && r.ok) {
+              if (el.downloadDirStatus) el.downloadDirStatus.textContent = "已保存到：" + r.path;
+              toast("已下载：" + r.path, "ok");
+              return;
+            }
+            toast((r && r.error) || "下载失败", "err");
+          } catch (e) {
+            toast("下载失败：" + String(e && e.message ? e.message : e), "err");
+          }
+          return;
+        }
+        // 纯浏览器预览
+        toast("预览模式：文件保存到浏览器默认下载目录", null);
+        fetch(url, { mode: "cors" })
+          .then(function (res) {
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            return res.blob();
+          })
+          .then(function (blob) {
+            var a = document.createElement("a");
+            var href = URL.createObjectURL(blob);
+            a.href = href;
+            a.download = filename || "video.mp4";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () { URL.revokeObjectURL(href); }, 10000);
+            toast("已开始下载：" + (filename || "video.mp4"), "ok");
+          })
+          .catch(function () {
+            window.open(url, "_blank", "noopener");
+            toast("无法直接下载，请在新窗口另存为", "err");
+          });
+      }
+
+      function renderTasks() {
+        if (!state.tasks.length) {
+          el.taskList.innerHTML =
+            '<div class="empty">暂无任务。<br/><span class="help-text">生成成功后请尽快「下载视频」——约 24 小时后可能删除；任务列表只保存记录和链接，不保存视频文件。</span></div>';
+          return;
+        }
+        var html = "";
+        state.tasks.forEach(function (t) {
+          var st = statusLabel(t);
+          html += '<div class="task-item" data-id="' + escapeAttr(t.id) + '">';
+          html += '<div class="task-media">';
+          if (t.videoUrl) {
+            html += '<video class="preview" controls preload="metadata" src="' + escapeAttr(t.videoUrl) + '"></video>';
+          } else {
+            html += '<div class="empty" style="padding:20px 8px;background:#F0F3F2;border-radius:10px">暂无预览</div>';
+          }
+          html += "</div>";
+          html += '<div class="task-body">';
+          html += '<div class="top"><span class="status ' + st.cls + '">' + st.text + "</span>";
+          html += '<span class="meta">' + escapeHtml(fmtTime(t.createdAt)) + "</span></div>";
+          html += '<p class="prompt">' + escapeHtml(t.prompt) + "</p>";
+          html += '<div class="meta">' + escapeHtml(t.model) + " · " + escapeHtml(t.size) + " · " + t.seconds + "s";
+          if (t.profileName) html += " · " + escapeHtml(t.profileName);
+          if (t.remoteId) html += " · id:" + escapeHtml(String(t.remoteId));
+          html += "</div>";
+          if (t.videoUrl) {
+            var note = videoAgeNote(t.createdAt);
+            var cls = note.level === "warn" ? "note-box" : "help-text";
+            html += '<div class="' + cls + '" style="margin-top:8px">' + escapeHtml(note.text) +
+              (t.downloadedAt ? " · 已下载 " + escapeHtml(fmtTime(t.downloadedAt)) : "") + "</div>";
+          }
+          if (t.error) html += '<div class="note-box" style="margin-top:8px">' + escapeHtml(t.error) + "</div>";
+          html += '<div class="task-actions">';
+          if (t.videoUrl) {
+            html += '<button type="button" class="primary" data-act="download">下载视频</button>';
+            html += '<button type="button" data-act="open">打开链接</button>';
+          } else {
+            html += '<button type="button" data-act="copy">复制参数</button>';
+          }
+          html += '<button type="button" data-act="delete">删除</button>';
+          html += "</div></div></div>";
+        });
+        el.taskList.innerHTML = html;
+      }
+
+      function fillDemo() {
+        if (!state.mock) {
+          toast("请先开启演示模式，再填入演示参数", "err");
+          return;
+        }
+        var model = activeModel();
+        var p = activeProfile();
+        if (!p) { toast("请先创建接口", "err"); return; }
+        if (!model) {
+          toast("当前接口无模型", "err");
+          return;
+        }
+        if (model.type !== "t2v") {
+          state.imageMode = "url";
+          renderImageMode();
+          if (el.imageFile) el.imageFile.value = "";
+          state.imageDataUrl = null;
+          if (el.imagePreview) {
+            el.imagePreview.classList.add("hidden");
+            el.imagePreview.removeAttribute("src");
+          }
+          el.imageUrl.value = "https://picsum.photos/seed/demo-i2v/720/720";
+          el.prompt.value = "镜头缓慢推进，一位穿风衣的人走在湿润的石板路上，雨后反光，电影感光线";
+          setImageStatus("演示参数：图片链接模式", "ok");
+        } else {
+          state.imageMode = "file";
+          renderImageMode();
+          state.imageDataUrl = null;
+          el.imageUrl.value = "";
+          el.prompt.value = "一只橘猫在窗台上打哈欠，阳光柔和，镜头缓慢推近，写实电影感";
+          setImageStatus("文生：无需参考图", null);
+        }
+        var sizes = model.sizes || ["720P"];
+        state.size = model.defaultSize || sizes[0];
+        state.seconds = model.defaultSec || 5;
+        el.seconds.value = String(state.seconds);
+        Array.prototype.forEach.call(el.sizeSeg.querySelectorAll("button"), function (btn) {
+          btn.classList.toggle("active", btn.getAttribute("data-size") === state.size);
+        });
+        updateCost();
+        toast("已填入演示参数（" + p.name + " / " + model.id + "）", "ok");
+      }
+
+      function initDom() {
+        el.modePill = document.getElementById("modePill");
+        el.brandSub = document.getElementById("brandSub");
+        el.profileSelect = document.getElementById("profileSelect");
+        el.profileSelectHelp = document.getElementById("profileSelectHelp");
+        el.modelSelect = document.getElementById("modelSelect");
+        el.modelHelp = document.getElementById("modelHelp");
+        el.noModelBanner = document.getElementById("noModelBanner");
+        el.imageField = document.getElementById("imageField");
+        el.imageReq = document.getElementById("imageReq");
+        el.imageHint = document.getElementById("imageHint");
+        el.imageHelp = document.getElementById("imageHelp");
+        el.imageUrl = document.getElementById("imageUrl");
+        el.imageModeSeg = document.getElementById("imageModeSeg");
+        el.imageFileBox = document.getElementById("imageFileBox");
+        el.imageUrlBox = document.getElementById("imageUrlBox");
+        el.imageFile = document.getElementById("imageFile");
+        el.btnPickGallery = document.getElementById("btnPickGallery");
+        el.imagePreview = document.getElementById("imagePreview");
+        el.imageStatus = document.getElementById("imageStatus");
+        el.prompt = document.getElementById("prompt");
+        el.sizeSeg = document.getElementById("sizeSeg");
+        el.seconds = document.getElementById("seconds");
+        el.secondsHint = document.getElementById("secondsHint");
+        el.secondsVal = document.getElementById("secondsVal");
+        el.costValue = document.getElementById("costValue");
+        el.costFormula = document.getElementById("costFormula");
+        el.costMeta = document.getElementById("costMeta");
+        el.btnGenerate = document.getElementById("btnGenerate");
+        el.btnFillDemo = document.getElementById("btnFillDemo");
+        el.taskList = document.getElementById("taskList");
+        el.btnClearTasks = document.getElementById("btnClearTasks");
+        el.profileList = document.getElementById("profileList");
+        el.profileFormTitle = document.getElementById("profileFormTitle");
+        el.profileFormPanel = document.getElementById("profileFormPanel");
+        el.editBanner = document.getElementById("editBanner");
+        el.profileFormHelp = document.getElementById("profileFormHelp");
+        el.profileName = document.getElementById("profileName");
+        el.baseUrl = document.getElementById("baseUrl");
+        el.apiKey = document.getElementById("apiKey");
+        el.btnSaveProfile = document.getElementById("btnSaveProfile");
+        el.btnResetProfileForm = document.getElementById("btnResetProfileForm");
+        el.modelOwnerBar = document.getElementById("modelOwnerBar");
+        el.modelScopeSelect = document.getElementById("modelScopeSelect");
+        el.modelList = document.getElementById("modelList");
+        el.addModelTarget = document.getElementById("addModelTarget");
+        el.newModelId = document.getElementById("newModelId");
+        el.newModelName = document.getElementById("newModelName");
+        el.newModelType = document.getElementById("newModelType");
+        el.newModelPrices = document.getElementById("newModelPrices");
+        el.newModelSizes = document.getElementById("newModelSizes") || { value: "" };
+        el.newModelMinSec = document.getElementById("newModelMinSec");
+        el.newModelMaxSec = document.getElementById("newModelMaxSec");
+        el.btnAddModel = document.getElementById("btnAddModel");
+        el.btnCancelEditModel = document.getElementById("btnCancelEditModel");
+        el.modelFormHelp = document.getElementById("modelFormHelp");
+        el.btnTestConn = document.getElementById("btnTestConn");
+        el.connStatus = document.getElementById("connStatus");
+        el.btnClearModels = document.getElementById("btnClearModels");
+        el.mockMode = document.getElementById("mockMode");
+        el.btnFillDemo = el.btnFillDemo || document.getElementById("btnFillDemo");
+        el.configuredList = document.getElementById("configuredList");
+        el.settingsHome = document.getElementById("settingsHome");
+        el.settingsEditor = document.getElementById("settingsEditor");
+        el.btnAddProfile = document.getElementById("btnAddProfile");
+        el.btnAddProfile2 = document.getElementById("btnAddProfile2");
+        el.btnSettingsBack = document.getElementById("btnSettingsBack");
+        el.btnResetDownloadDir = document.getElementById("btnResetDownloadDir");
+        el.downloadDirDisplay = document.getElementById("downloadDirDisplay");
+        el.fontSizeSeg = document.getElementById("fontSizeSeg");
+        el.btnSavePrefs = document.getElementById("btnSavePrefs") || { addEventListener: function () {} };
+        el.btnExportData = document.getElementById("btnExportData");
+        el.btnImportData = document.getElementById("btnImportData");
+        el.importDataFile = document.getElementById("importDataFile");
+        el.backupStatus = document.getElementById("backupStatus");
+        el.downloadDir = document.getElementById("downloadDir");
+        el.btnPickDownloadDir = document.getElementById("btnPickDownloadDir");
+        el.btnSaveDownloadDir = document.getElementById("btnSaveDownloadDir");
+        el.downloadDirStatus = document.getElementById("downloadDirStatus");
+        el.toast = document.getElementById("toast");
+        el.confirmMask = document.getElementById("confirmMask");
+        el.confirmTitle = document.getElementById("confirmTitle");
+        el.confirmMsg = document.getElementById("confirmMsg");
+        el.confirmOk = document.getElementById("confirmOk");
+        el.confirmCancel = document.getElementById("confirmCancel");
+      }
+
+      function bindEvents() {
+        // 设置子页 / 演示开关 / 字体 / 目录
+        if (el.mockMode) {
+          el.mockMode.addEventListener("change", function () {
+            applyMockMode(el.mockMode.checked);
+          });
+        }
+        if (el.btnFillDemo) el.btnFillDemo.disabled = !state.mock;
+        if (el.btnAddProfile) el.btnAddProfile.addEventListener("click", function () { openSettingsEditor(null); });
+        if (el.btnSettingsBack) el.btnSettingsBack.addEventListener("click", leaveSettingsEditor);
+        if (el.btnResetDownloadDir) el.btnResetDownloadDir.addEventListener("click", resetDownloadDir);
+        var fsRange = document.getElementById("fontSizeRange");
+        if (fsRange) {
+          fsRange.addEventListener("input", function () {
+            applyFontSize(Number(fsRange.value) / 100);
+          });
+        }
+        ["profileName", "baseUrl", "apiKey", "newModelId", "newModelName", "newModelType",
+          "newModelPrices", "newModelMinSec", "newModelMaxSec"].forEach(function (id) {
+          var node = document.getElementById(id);
+          if (node) {
+            node.addEventListener("input", markSettingsDirty);
+            node.addEventListener("change", markSettingsDirty);
+          }
+        });
+        // 页签导航在 bindTabNav 单独绑定，避免此处异常导致无法切页
+        el.profileSelect && el.profileSelect.addEventListener("change", function () {
+          var id = el.profileSelect.value;
+          var p = findProfile(id);
+          if (!p) return;
+          state.activeProfileId = p.id;
+          if (!state.modelOwnerProfileId) state.modelOwnerProfileId = p.id;
+          persist();
+          refreshGenerateChrome();
+          toast("已切换接口：" + p.name, "ok");
+        });
+
+        el.modelSelect.addEventListener("change", function () {
+          var id = el.modelSelect.value;
+          var p = activeProfile();
+          var model = p ? getModelInProfile(p, id) : null;
+          if (!model) return;
+          setActiveModelId(id);
+          state.size = model.defaultSize || (model.sizes && model.sizes[0]) || "720P";
+          state.seconds = model.defaultSec || 5;
+          applyModelToForm(model);
+        });
+
+        if (el.imageModeSeg) {
+          el.imageModeSeg.addEventListener("click", function (e) {
+            var btn = e.target.closest("button[data-imode]");
+            if (!btn) return;
+            state.imageMode = btn.getAttribute("data-imode") === "url" ? "url" : "file";
+            renderImageMode();
+            setImageStatus(state.imageMode === "file" ? "使用本地图片" : "使用图片链接", null);
+          });
+        }
+
+        if (el.imageFile) {
+          el.imageFile.addEventListener("change", function () {
+            var f = el.imageFile.files && el.imageFile.files[0];
+            if (!f) {
+              state.imageDataUrl = null;
+              state.imageFileName = "";
+              if (el.imagePreview) {
+                el.imagePreview.classList.add("hidden");
+                el.imagePreview.removeAttribute("src");
+              }
+              setImageStatus("未选择图片", null);
+              return;
+            }
+            setImageStatus("正在处理图片…", null);
+            compressImageFile(f, 1280, 0.85).then(function (dataUrl) {
+              state.imageDataUrl = dataUrl;
+              state.imageFileName = f.name || "local-image";
+              state.imageMode = "file";
+              renderImageMode();
+              if (el.imagePreview) {
+                el.imagePreview.src = dataUrl;
+                el.imagePreview.classList.remove("hidden");
+              }
+              var kb = Math.round(dataUrl.length * 0.75 / 1024);
+              setImageStatus("已就绪：" + (f.name || "图片") + "（约 " + kb + " KB）", "ok");
+            }).catch(function (err) {
+              state.imageDataUrl = null;
+              setImageStatus(String(err && err.message ? err.message : err), "err");
+              toast("图片处理失败", "err");
+            });
+          });
+        }
+        if (el.btnPickGallery) {
+          el.btnPickGallery.addEventListener("click", function () {
+            pickImageFromSystem();
+          });
+          // 安卓 / 有原生插件时显示相册按钮
+          if (hasNativeDir() || (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform())) {
+            el.btnPickGallery.classList.remove("hidden");
+          }
+        }
+
+        el.sizeSeg.addEventListener("click", function (e) {
+          var btn = e.target.closest("button[data-size]");
+          if (!btn) return;
+          state.size = btn.getAttribute("data-size");
+          Array.prototype.forEach.call(el.sizeSeg.querySelectorAll("button"), function (b) {
+            b.classList.toggle("active", b === btn);
+          });
+          updateCost();
+        });
+
+        el.seconds.addEventListener("input", function () {
+          state.seconds = parseInt(el.seconds.value, 10) || 5;
+          updateCost();
+        });
+
+        el.btnGenerate.addEventListener("click", startGenerate);
+        el.btnFillDemo.addEventListener("click", fillDemo);
+        el.btnSaveProfile.addEventListener("click", saveProfile);
+        el.btnResetProfileForm.addEventListener("click", cancelEdit);
+        try { el.btnSavePrefs && el.btnSavePrefs.addEventListener && el.btnSavePrefs.addEventListener("click", savePrefs); } catch (e) {}
+        if (el.btnExportData) el.btnExportData.addEventListener("click", exportBackup);
+        if (el.btnPickDownloadDir) el.btnPickDownloadDir.addEventListener("click", function () { pickDownloadDir(); });
+        if (el.btnSaveDownloadDir) el.btnSaveDownloadDir.addEventListener("click", saveDownloadDirFromInput);
+        if (el.btnImportData) {
+          el.btnImportData.addEventListener("click", function () {
+            if (el.importDataFile) el.importDataFile.click();
+          });
+        }
+        if (el.importDataFile) {
+          el.importDataFile.addEventListener("change", function () {
+            var f = el.importDataFile.files && el.importDataFile.files[0];
+            importBackupFile(f);
+            el.importDataFile.value = "";
+          });
+        }
+        el.btnAddModel.addEventListener("click", addModelToOwner);
+        el.btnClearModels.addEventListener("click", clearModelsOfOwner);
+        if (el.modelScopeSelect) {
+          el.modelScopeSelect.addEventListener("change", function () {
+            if (isCreateForm()) {
+              renderModelManagement();
+              return;
+            }
+            var v = el.modelScopeSelect.value;
+            var p = findProfile(v);
+            if (!p) return;
+            fillProfileForm(p); // 切换到该接口：模型区只显示它
+            toast("已切换到接口：" + p.name, "ok");
+          });
+        }
+
+        el.btnClearTasks.addEventListener("click", function () {
+          if (!state.tasks.length) { toast("任务列表已经是空的"); return; }
+          askConfirm("清空任务", "确定清空本地全部任务？", "确认清空").then(function (ok) {
+            if (!ok) return;
+            Object.keys(state.pollTimers).forEach(function (k) {
+              clearTimeout(state.pollTimers[k]); delete state.pollTimers[k];
+            });
+            state.tasks = [];
+            persistTasks();
+            renderTasks();
+            toast("任务已清空", "ok");
+          });
+        });
+
+        (el.configuredList || el.profileList).addEventListener("click", function (e) {
+          var btn = e.target && e.target.closest ? e.target.closest("button[data-pact]") : null;
+          if (!btn) return;
+          // 兼容 configured-item / profile-item 两种卡片类名
+          var item = btn.closest(".configured-item") || btn.closest(".profile-item") || btn.closest("[data-id]");
+          if (!item) return;
+          var id = item.getAttribute("data-id");
+          var act = btn.getAttribute("data-pact");
+          var profile = findProfile(id);
+          if (!profile) return;
+
+          if (act === "use") {
+            state.activeProfileId = id;
+            state.modelOwnerProfileId = id;
+            if (!state.mock && profile.apiKey) state.mock = false;
+            persist();
+            renderAllSettings();
+            if (el.mockMode) el.mockMode.checked = !!state.mock;
+            refreshGenerateChrome();
+            toast("已切换接口：" + profile.name + (profileModels(profile).length ? "" : "（模型为空，请添加）"), "ok");
+          } else if (act === "models" || act === "edit") {
+            openSettingsEditor(profile);
+            toast("配置：" + profile.name, null);
+          } else if (act === "del") {
+            askConfirm("删除接口", "删除「" + profile.name + "」？其下模型列表将一并删除。", "确认删除").then(function (ok) {
+              if (!ok) return;
+              state.profiles = state.profiles.filter(function (p) { return p.id !== id; });
+              if (state.activeProfileId === id) {
+                var next = state.profiles[0] || null;
+                state.activeProfileId = next ? next.id : null;
+              }
+              if (state.modelOwnerProfileId === id) state.modelOwnerProfileId = state.activeProfileId;
+              if (state.boundProfileId === id) state.boundProfileId = null;
+              if (state.editingProfileId === id) state.editingProfileId = null;
+              persist();
+              fillProfileForm(null); // 回到新建：模型区空
+              renderAllSettings();
+              refreshGenerateChrome();
+              toast("已删除接口：" + profile.name, "ok");
+            });
+          }
+        });
+
+        el.modelList.addEventListener("click", function (e) {
+          var btn = e.target && e.target.closest ? e.target.closest("button[data-mact]") : null;
+          if (!btn) return;
+          var act = btn.getAttribute("data-mact");
+          var mid = btn.getAttribute("data-id");
+          if (act === "edit") {
+            var list = isCreateForm() ? (state.pendingModels || []) : (boundProfile() ? boundProfile().models : []);
+            var hit = null;
+            for (var i = 0; i < (list || []).length; i++) {
+              if (list[i] && list[i].id === mid) { hit = list[i]; break; }
+            }
+            if (!hit) { toast("模型不存在", "err"); return; }
+            fillModelForm(hit);
+            var panel = el.modelList.closest ? el.modelList.closest(".panel") : null;
+            if (panel && panel.scrollIntoView) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            toast("已回填模型，可直接改后保存", null);
+            return;
+          }
+          if (act === "del") deleteModelFromOwner(mid);
+        });
+        if (el.btnCancelEditModel) {
+          el.btnCancelEditModel.addEventListener("click", function () {
+            resetModelForm();
+            clearSettingsDirty();
+            toast("已取消编辑模型", "ok");
+          });
+        }
+        if (el.btnTestConn) el.btnTestConn.addEventListener("click", function () { testConnection(null); });
+
+        el.taskList.addEventListener("click", function (e) {
+          var btn = e.target && e.target.closest ? e.target.closest("button[data-act]") : null;
+          if (!btn) return;
+          var item = btn.closest(".task-item");
+          if (!item) return;
+          var task = findTask(item.getAttribute("data-id"));
+          if (!task) return;
+          var act = btn.getAttribute("data-act");
+          if (act === "download" && task.videoUrl) {
+            downloadVideoFile(task.videoUrl, defaultVideoName(task)).then(function () {
+              task.downloadedAt = Date.now();
+              persistTasks();
+              renderTasks();
+            }).catch(function () {});
+          } else if (act === "open" && task.videoUrl) {
+            window.open(task.videoUrl, "_blank", "noopener");
+          } else if (act === "copy") {
+            var payload = JSON.stringify(buildRequestBody(task), null, 2);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(payload).then(function () { toast("参数已复制", "ok"); });
+            } else toast(payload.slice(0, 80));
+          } else if (act === "delete") {
+            if (state.pollTimers[task.id]) {
+              clearTimeout(state.pollTimers[task.id]);
+              delete state.pollTimers[task.id];
+            }
+            state.tasks = state.tasks.filter(function (t) { return t.id !== task.id; });
+            persistTasks();
+            renderTasks();
+          }
+        });
+      }
+
+      function safeBoot() {
+        try {
+          initDom();
+        } catch (e) {
+          console.error("initDom", e);
+        }
+        try {
+          bindTabNav();
+        } catch (e) {
+          console.error("bindTabNav", e);
+        }
+        try {
+          bindEvents();
+        } catch (e) {
+          console.error("bindEvents", e);
+        }
+        // 先从本机 data 恢复，再渲染，避免空种子覆盖自用 Key
+        Promise.resolve(restoreFromHostFile()).then(function (restored) {
+          if (restored) {
+            state = migrateState();
+            try { toast("已从本机 data 恢复配置", "ok"); } catch (e) {}
+          }
+          try {
+          if (!state.activeProfileId && state.profiles[0]) {
+            state.activeProfileId = state.profiles[0].id;
+          }
+          setEditorVisible(false);
+          fillProfileForm(null);
+          if (el.mockMode) el.mockMode.checked = !!state.mock;
+          if (el.btnFillDemo) el.btnFillDemo.disabled = !state.mock;
+          try {
+            var fs = localStorage.getItem("aiv_font_scale") || "1";
+            applyFontSize(fs);
+          } catch (e) {}
+          refreshGenerateChrome();
+          renderAllSettings();
+          renderTasks();
+          renderDownloadDir();
+          persist();
+          try { ensureDesktopDownloadDir().then(function () { renderDownloadDir(); }); } catch (e) {}
+          scheduleRestoreAndRender();
+        } catch (e) {
+          console.error("bootRender", e);
+        }
+        setTab("generate");
+        }).catch(function () {
+          try {
+            setEditorVisible(false);
+            fillProfileForm(null);
+            refreshGenerateChrome();
+            renderAllSettings();
+            renderTasks();
+            persist();
+          } catch (e) {}
+          setTab("generate");
+          scheduleRestoreAndRender();
+        });
+      }
+
+      function bindTabNav() {
+        /* 页签已用纯 CSS radio + label，无需 JS 绑定 */
+      }
+
+      safeBoot();
+    })();
+  </script>
+</body>
+</html>

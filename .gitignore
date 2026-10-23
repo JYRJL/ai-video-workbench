@@ -1,0 +1,26 @@
+# ===== 构建产物与缓存（不进仓库） =====
+__pycache__/
+desktop/work/
+desktop/build/
+desktop/dist/
+
+android/node_modules/
+android/android/.gradle/
+android/android/**/build/
+android/android/local.properties
+
+# ===== 运行数据（可能含 API Key，严禁提交） =====
+data/
+*.app-state.json
+*_backup*.json
+
+# ===== 二进制产物（请通过 GitHub Releases 发布） =====
+*.exe
+*.apk
+*.zip
+
+# ===== 编辑器 / 系统 =====
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
